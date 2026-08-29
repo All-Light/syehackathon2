@@ -436,14 +436,21 @@ function Karta({ positioner }: { positioner: Position[] }) {
    companies sit one to three orders of magnitude apart — a 1.8 bn SEK incumbent
    beside a 1.2 MSEK one-person shop — and on a single linear axis everyone but
    the largest collapses onto the baseline. Indexing every series to 100 at its
-   own first filed year was the alternative and was rejected: the series start in
-   different years and run for different lengths, so a common base would be a
-   fiction, and indexing throws absolute size away entirely. So each panel keeps
+   own first filed year was the alternative and was rejected here: the series
+   start in different years and run for different lengths, so a common base
+   would be a fiction, and indexing throws absolute size away entirely. So each
+   panel keeps
    its own zero-based scale (shape is comparable across panels, height is not —
    each panel prints its own ceiling), the year axis is shared so time lines up,
    the headline figure carries absolute size, and growth is stated per year
    rather than as a total because the spans differ. One hue throughout: identity
    comes from the panel heading, never from a colour.
+
+   The dashboard's own exhibit (components/Falt.tsx) does index, on a ratio
+   scale, and that is not a disagreement: it puts every company on one canvas to
+   answer "who is pulling away", which needs a shared axis and therefore an
+   index. This one answers "how has each one done", where a panel per company is
+   truer and absolute size can be kept. Different questions, different form.
    --------------------------------------------------------------------------- */
 
 
