@@ -1,6 +1,9 @@
-import { harStripe, skapaCheckout, type Plan } from "@/lib/stripe";
+import { harStripe, skapaCheckout, type Plan, kopAktivt } from "@/lib/stripe";
 
 export async function POST(req: Request) {
+  if (!kopAktivt()) {
+    return Response.json({ fel: "Sales are not open yet." }, { status: 403 });
+  }
   const { id, plan } = (await req.json()) as { id?: string; plan?: Plan };
   if (!id) return Response.json({ fel: "Missing report id." }, { status: 400 });
   if (plan !== "rapport" && plan !== "bevakning") {

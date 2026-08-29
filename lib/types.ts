@@ -122,6 +122,8 @@ export type Rapport = {
 
 /** What the working view sees, streamed over SSE as the agent runs. */
 export type Handelse =
+  /** First frame of every run: the id its URL will live at. */
+  | { typ: "korning"; id: string }
   | { typ: "steg"; steg: string; text: string }
   | { typ: "kandidat"; namn: string; url: string }
   | { typ: "konkurrent"; konkurrent: Konkurrent }

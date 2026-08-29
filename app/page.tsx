@@ -7,6 +7,19 @@ import type { Handelse, Rapport } from "@/lib/types";
 
 type Fas = "start" | "arbetar" | "klar";
 
+/**
+ * The run's id, first thing on the stream. Deliberately not part of `Handelse`
+ * yet — that union lives in lib/types.ts, which is being edited elsewhere — so
+ * the client recognises the event by its shape instead of by its type.
+ */
+type Korningshandelse = { typ: "korning"; id: string };
+
+function arKorning(h: unknown): h is Korningshandelse {
+  if (typeof h !== "object" || h === null) return false;
+  const k = h as { typ?: unknown; id?: unknown };
+  return k.typ === "korning" && typeof k.id === "string";
+}
+
 export default function Sida() {
   const [fas, sattFas] = useState<Fas>("start");
   const [url, sattUrl] = useState("");
@@ -27,6 +40,9 @@ export default function Sida() {
     sattRader([]);
     sattKandidater([]);
     sattForetag(null);
+    // A second analysis from a page still showing /r/<previous> would otherwise
+    // sit under an address that describes someone else's run.
+    window.history.replaceState(null, "", "/");
 
     avbryt.current?.abort();
     const styr = new AbortController();
@@ -57,7 +73,15 @@ export default function Sida() {
         for (const bit of bitar) {
           const rad = bit.trim();
           if (!rad.startsWith("data: ")) continue;
-          hantera(JSON.parse(rad.slice(6)) as Handelse);
+          const h: unknown = JSON.parse(rad.slice(6));
+          if (arKorning(h)) {
+            sattRapportId(h.id);
+            // replaceState, not the router: a navigation unmounts this
+            // component and aborts the fetch that is producing the run.
+            window.history.replaceState(null, "", `/r/${h.id}`);
+            continue;
+          }
+          hantera(h as Handelse);
         }
       }
     } catch (e) {

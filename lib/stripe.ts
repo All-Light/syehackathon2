@@ -11,10 +11,28 @@ const TIMEOUT = Number(process.env.STRIPE_TIMEOUT_MS ?? 20_000);
 export type Plan = "rapport" | "bevakning";
 
 /** Öre, since Stripe counts SEK in minor units. */
+/**
+ * Amounts are in öre. `ordinarie` is what the thing costs; `belopp` is what we
+ * charge today. The two differ while the early-bird price is running, and the
+ * gap is the offer — so both are exported and the page shows both.
+ */
+export const ORDINARIE_RAPPORT = 100_000;
+
 export const PRISER: Record<Plan, { belopp: number; namn: string; manatlig: boolean }> = {
-  rapport: { belopp: 49_000, namn: "Koll competitor report", manatlig: false },
+  rapport: { belopp: 50_000, namn: "Koll competitor report (early bird)", manatlig: false },
   bevakning: { belopp: 29_000, namn: "Koll monitoring", manatlig: true },
 };
+
+/**
+ * Selling is off until it is switched on. Read on the server by the checkout
+ * route and inlined into the client bundle for the button, so one variable
+ * governs both and there is no state where the button works but the route
+ * refuses. Next inlines NEXT_PUBLIC_* at build time, so flipping it needs a
+ * redeploy — which is the point: turning sales on should be deliberate.
+ */
+export function kopAktivt(): boolean {
+  return process.env.NEXT_PUBLIC_KOP_AKTIV === "1";
+}
 
 export function harStripe(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY);

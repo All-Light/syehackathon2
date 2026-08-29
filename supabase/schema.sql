@@ -41,3 +41,36 @@ alter table koll_forandringar enable row level security;
 -- gets "permission denied" without this.
 grant all on table koll_rapporter to service_role;
 grant all on table koll_forandringar to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Körningar. A run gets its row the moment it starts, so the URL is shareable
+-- while the agent is still working rather than only after it finished.
+--
+-- The id is minted by the server, not by the database, and the finished report
+-- is later inserted into koll_rapporter under that same id: /r/<id> is one
+-- address for the whole life of an analysis, handed out before there is
+-- anything to show.
+-- ---------------------------------------------------------------------------
+
+create table if not exists koll_korningar (
+  id uuid primary key,
+  skapad timestamptz not null default now(),
+  -- The heartbeat. A run whose function was killed mid-way stops touching this,
+  -- which is the only way a reader can tell "still working" from "gone".
+  andrad timestamptz not null default now(),
+  url text not null,
+  namn text,
+  status text not null default 'kor', -- kor | klar | fel
+  fel text,
+  -- What the working view draws, not the raw event log: the events carry whole
+  -- competitor objects the progress view never shows and the finished report
+  -- already stores.
+  arbete jsonb not null default '{}'::jsonb
+);
+
+create index if not exists koll_korningar_status_idx
+  on koll_korningar (status, andrad desc) where status = 'kor';
+
+alter table koll_korningar enable row level security;
+
+grant all on table koll_korningar to service_role;
