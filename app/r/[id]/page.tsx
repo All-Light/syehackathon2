@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Sparad from "@/components/Sparad";
 import Rapportvy from "@/components/Rapportvy";
 import { hamtaKorning } from "@/lib/korning";
 import { hamtaRapport } from "@/lib/rapporter";
@@ -22,7 +23,8 @@ export default async function DeladRapport({
   if (sparad) {
     return (
       <main className="min-h-dvh bg-papper">
-        <Rapportvy
+        <Sparad id={id} url={sparad.url} namn={sparad.namn} />
+      <Rapportvy
           rapport={sparad.rapport}
           id={sparad.id}
           bevakasFran={sparad.bevakas}

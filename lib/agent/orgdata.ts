@@ -198,6 +198,9 @@ function plocka(md: string, url: string, namn: string, kravNamn = true): Orgdata
   const res = md.match(/Resultat efter finansnetto\s*(\d{4})?\s*(-?[\d\s  ]{3,})/);
   const anst = md.match(/Antal anställda\s*(\d[\d\s  ]*)/);
   const org = md.match(/(?:Org\.?nr|Organisationsnummer)\s*(\d{6}-?\d{4})/);
+  // "Registreringsår1993", or the fuller "Registreringsdatum1993-06-30".
+  const reg =
+    md.match(/Registreringsår\s*(\d{4})/) ?? md.match(/Registreringsdatum\s*(\d{4})/);
 
   const omsattningTkr = tal(oms?.[2]);
   const anstallda = tal(anst?.[1]);
@@ -210,6 +213,7 @@ function plocka(md: string, url: string, namn: string, kravNamn = true): Orgdata
     omsattningTkr,
     resultatTkr: tal(res?.[2]),
     anstallda,
+    registreringsar: reg ? Number(reg[1]) : null,
     // The registers chart history in JavaScript, so year-on-year growth is not
     // in the text. Better absent than guessed.
     tillvaxtProcent: null,

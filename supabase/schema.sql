@@ -74,3 +74,24 @@ create index if not exists koll_korningar_status_idx
 alter table koll_korningar enable row level security;
 
 grant all on table koll_korningar to service_role;
+
+-- ---------------------------------------------------------------------------
+-- E-post. The customer has no account: the report url is their whole identity,
+-- which means we have no way to reach a person who closed the tab. An address
+-- left on a report is the one thread back — and the only list this product
+-- builds.
+--
+-- It sits on the report rather than in a table of its own because that is what
+-- it is: a property of this report, not a subscription. Nothing is sent from
+-- here; there is no mail provider configured.
+--
+-- No new grant: `grant all on table` above covers columns added later, and the
+-- Management API's missing default privileges only bite on new *tables*.
+-- ---------------------------------------------------------------------------
+
+alter table koll_rapporter add column if not exists epost text;
+
+-- Answers the only question ever asked of this column — "who has left us an
+-- address, and on what" — without reading every report body.
+create index if not exists koll_rapporter_epost_idx
+  on koll_rapporter (epost) where epost is not null;

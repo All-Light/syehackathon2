@@ -1,6 +1,12 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore } from "react";
+import {
+  hamtaTidigare,
+  prenumerera,
+  serverTidigare,
+  sparaTidigare,
+} from "@/lib/tidigare";
 import Arbetsvy, { type Kandidat } from "@/components/Arbetsvy";
 import Rapportvy from "@/components/Rapportvy";
 import type { Handelse, Rapport } from "@/lib/types";
@@ -41,141 +47,6 @@ function arKorning(h: unknown): h is Korningshandelse {
  * Versioned, so a later change to the row shape can claim a new key and simply
  * ignore what an old browser left behind instead of having to migrate it.
  */
-const LAGERNYCKEL = "sweep.tidigare.v1";
-
-/** Enough to get back to last week's runs, few enough to stay a footer. */
-const MAX_TIDIGARE = 8;
-
-/** One finished run, as much of it as is needed to offer it back. */
-type Tidigare = {
-  id: string;
-  /** What was typed into the form. Kept as the row's identity, not for display. */
-  url: string;
-  /** The company the agent read us as. Falls back to the host when unnamed. */
-  namn: string;
-  /** Epoch ms. Rendered as an age, so no formatted date reaches the markup. */
-  tid: number;
-};
-
-/** Everything under the key was written by an older build, so trust nothing. */
-function arTidigare(v: unknown): v is Tidigare {
-  if (typeof v !== "object" || v === null) return false;
-  const t = v as Record<string, unknown>;
-  return (
-    typeof t.id === "string" &&
-    t.id.length > 0 &&
-    typeof t.url === "string" &&
-    typeof t.namn === "string" &&
-    t.namn.length > 0 &&
-    typeof t.tid === "number" &&
-    Number.isFinite(t.tid)
-  );
-}
-
-/**
- * "YourCompany.com/", "https://www.yourcompany.com" and "yourcompany.com" are
- * one company to whoever reads this list, so they collapse to one row.
- */
-function urlnyckel(url: string): string {
-  return url
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/+$/, "");
-}
-
-/**
- * Never throws. localStorage is absent on the server, absent in some private
- * windows, and throws outright where site data is blocked — in every one of
- * those cases the honest answer is an empty list, not a broken page.
- */
-function hamtaTidigare(): Tidigare[] {
-  try {
-    const ratt = window.localStorage.getItem(LAGERNYCKEL);
-    if (!ratt) return [];
-    const tolkat: unknown = JSON.parse(ratt);
-    if (!Array.isArray(tolkat)) return [];
-    const sedda = new Set<string>();
-    return tolkat
-      .filter(arTidigare)
-      .sort((a, b) => b.tid - a.tid)
-      .filter((t) => {
-        // An older build may have written duplicates; newest wins.
-        const nyckel = urlnyckel(t.url);
-        if (sedda.has(nyckel)) return false;
-        sedda.add(nyckel);
-        return true;
-      })
-      .slice(0, MAX_TIDIGARE);
-  } catch {
-    return [];
-  }
-}
-
-/* The list is an external store rather than component state, so the page can
-   read it through useSyncExternalStore: that hook takes a separate server
-   snapshot, which is what makes the empty server HTML and the first client
-   paint agree by construction instead of by convention. */
-
-/** One shared empty list, so "nothing stored" is the same value every time. */
-const TOMT: Tidigare[] = [];
-
-/** Snapshots are compared by identity, so parsing on every call would loop. */
-let cachad: Tidigare[] | null = null;
-const lyssnare = new Set<() => void>();
-
-function meddela() {
-  for (const pa of lyssnare) pa();
-}
-
-function prenumerera(pa: () => void): () => void {
-  lyssnare.add(pa);
-  // A run finished in another tab is still this browser's history.
-  const vidLagring = (e: StorageEvent) => {
-    if (e.key !== null && e.key !== LAGERNYCKEL) return;
-    cachad = null;
-    meddela();
-  };
-  window.addEventListener("storage", vidLagring);
-  return () => {
-    lyssnare.delete(pa);
-    window.removeEventListener("storage", vidLagring);
-  };
-}
-
-function ogonblick(): Tidigare[] {
-  if (cachad === null) {
-    const lista = hamtaTidigare();
-    cachad = lista.length > 0 ? lista : TOMT;
-  }
-  return cachad;
-}
-
-/** The server has no localStorage, so empty is the only honest snapshot there. */
-function serverOgonblick(): Tidigare[] {
-  return TOMT;
-}
-
-/**
- * Never throws. A full quota or a blocked store costs the reader this browser's
- * list at most, and never the run that was just paid for — the report itself is
- * already safe on the server at /r/<id>.
- */
-function sparaTidigare(post: Tidigare) {
-  const nyckel = urlnyckel(post.url);
-  const lista = [post, ...ogonblick().filter((t) => urlnyckel(t.url) !== nyckel)].slice(
-    0,
-    MAX_TIDIGARE,
-  );
-  cachad = lista;
-  meddela();
-  try {
-    window.localStorage.setItem(LAGERNYCKEL, JSON.stringify(lista));
-  } catch {
-    // Intentionally swallowed. See above.
-  }
-}
 
 /**
  * Coarse on purpose. The row answers "which run was that", not "when exactly",
@@ -205,7 +76,7 @@ export default function Sida() {
   // Read through the store's server snapshot, which is empty by definition:
   // localStorage does not exist on the server, so anything read during render
   // would make the client's first paint contradict the HTML it hydrates.
-  const tidigare = useSyncExternalStore(prenumerera, ogonblick, serverOgonblick);
+  const tidigare = useSyncExternalStore(prenumerera, hamtaTidigare, serverTidigare);
   const avbryt = useRef<AbortController | null>(null);
   /**
    * The run in progress, gathered as its events arrive. A ref, not state: the
@@ -310,9 +181,7 @@ export default function Sida() {
           sparaTidigare({
             id,
             url: korning.current.url,
-            // An unnamed run still deserves a row; the host is what the person
-            // typed, so they will recognise it.
-            namn: korning.current.namn?.trim() || urlnyckel(korning.current.url) || "Untitled",
+            namn: korning.current.namn?.trim() ?? "",
             tid: Date.now(),
           });
         }

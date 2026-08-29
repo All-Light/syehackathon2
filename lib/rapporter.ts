@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { db } from "./db";
 import type { Forandring, Rapport } from "./types";
 
@@ -31,7 +32,13 @@ export async function sparaRapport(rapport: Rapport): Promise<string | null> {
   return data.id as string;
 }
 
-export async function hamtaRapport(id: string): Promise<SparadRapport | null> {
+/**
+ * Request-scoped: the tab bar in the layout and the page beneath it both need
+ * the same row, and without this every report view costs two round-trips.
+ */
+export const hamtaRapport = cache(async function hamtaRapport(
+  id: string,
+): Promise<SparadRapport | null> {
   const klient = db();
   if (!klient) return null;
   const { data, error } = await klient
@@ -41,7 +48,7 @@ export async function hamtaRapport(id: string): Promise<SparadRapport | null> {
     .single();
   if (error || !data) return null;
   return data as SparadRapport;
-}
+});
 
 export async function uppdateraRapport(id: string, rapport: Rapport): Promise<boolean> {
   const klient = db();

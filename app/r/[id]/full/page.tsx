@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import Sparad from "@/components/Sparad";
 import Fullrapport from "@/components/Fullrapport";
 import { Framsida, Kallor } from "@/components/Tryck";
 import { hamtaRapport } from "@/lib/rapporter";
@@ -31,15 +31,10 @@ export default async function FullSida({
   return (
     <main className="min-h-dvh bg-papper">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-16">
-        <Link
-          href={`/r/${id}`}
-          className="ej-tryck self-start text-[11px] uppercase tracking-[0.16em] text-dampad underline-offset-4 hover:text-amber hover:underline"
-        >
-          ← {sparad.namn} · summary
-        </Link>
 
         <Framsida rapport={sparad.rapport} />
 
+        <Sparad id={id} url={sparad.url} namn={sparad.namn} />
         <Fullrapport
           id={id}
           namn={sparad.rapport.egen.namn}

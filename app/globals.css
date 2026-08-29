@@ -13,6 +13,12 @@
   --natt-mjuk: #17171a;
   --natt-text: #f0ece5;
   --natt-dampad: #8a857c;
+  /* The second accent, and it has one job: on a chart of six trajectories the
+     only question a reader has is which line is theirs, and hue answers that
+     where form cannot. It belongs to the dashboard; the report keeps its
+     single-accent discipline. */
+  --du: #2f6b63;
+  --du-ljus: #3f8f83;
 }
 
 @theme inline {
@@ -28,6 +34,8 @@
   --color-natt-mjuk: var(--natt-mjuk);
   --color-natt-text: var(--natt-text);
   --color-natt-dampad: var(--natt-dampad);
+  --color-du: var(--du);
+  --color-du-ljus: var(--du-ljus);
   --font-serif: var(--font-display);
   --font-sans: var(--font-ui);
 }
@@ -311,5 +319,33 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .svep-huvud {
     display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The dashboard's one new motion: a trajectory drawing itself in. Staggered per
+   line, the reader's own last, so the eye lands on it.
+   --------------------------------------------------------------------------- */
+@keyframes drag {
+  from {
+    stroke-dashoffset: var(--langd);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.drag {
+  stroke-dasharray: var(--langd);
+  stroke-dashoffset: var(--langd);
+  animation: drag 900ms cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+
+/* The global rule only shortens durations, which leaves a path stranded
+   half-drawn. Draw it outright instead. */
+@media (prefers-reduced-motion: reduce) {
+  .drag {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
   }
 }

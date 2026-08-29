@@ -20,7 +20,7 @@ export const ORDINARIE_RAPPORT = 100_000;
 
 export const PRISER: Record<Plan, { belopp: number; namn: string; manatlig: boolean }> = {
   rapport: { belopp: 50_000, namn: "Sweep competitor report (early bird)", manatlig: false },
-  bevakning: { belopp: 29_000, namn: "Sweep monitoring", manatlig: true },
+  bevakning: { belopp: 100_000, namn: "Sweep monitoring", manatlig: true },
 };
 
 /**

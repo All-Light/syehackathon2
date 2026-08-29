@@ -21,6 +21,9 @@ export type Orgdata = {
   omsattningTkr: number | null;
   resultatTkr: number | null;
   anstallda: number | null;
+  /** Year the company was registered. A market being entered fast looks
+   *  different from a settled one, and this is the only honest way to see it. */
+  registreringsar: number | null;
   tillvaxtProcent: number | null;
   ar: number | null;
   /** Newest first. Empty when only a single year could be read. */

@@ -385,9 +385,15 @@ export default function Rapportvy({
                 : "border border-black text-black hover:bg-black hover:text-papper"
             }`}
           >
-            {bevakas ? "Watching — we'll be in touch" : "Watch these"}
+            {bevakas ? "Watching — changes show up on the dashboard" : "Watch these"}
           </button>
           <Lyssna id={id} />
+          <a
+            href={`/r/${id}/bevakning`}
+            className="border border-linje px-5 py-2.5 text-sm text-dampad transition-colors hover:border-black hover:text-black"
+          >
+            Open the dashboard
+          </a>
           <button
             type="button"
             onClick={koraKontroll}
