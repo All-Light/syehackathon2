@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Betala from "@/components/Betala";
+import Lyssna from "@/components/Lyssna";
 import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
 
 function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | null }) {
@@ -374,6 +375,7 @@ export default function Rapportvy({
           >
             {bevakas ? "Watching — we'll be in touch" : "Watch these"}
           </button>
+          <Lyssna id={id} />
           <button
             type="button"
             onClick={koraKontroll}

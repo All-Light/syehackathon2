@@ -21,6 +21,14 @@ function korta(text: string, tak: number): string {
   return `${bit.slice(0, bit.lastIndexOf(" "))}…`;
 }
 
+/** Extracted price periods come through as "per månad" as often as "månad",
+ *  and "tar 99 kr per per månad" is the kind of thing a listener notices. */
+function period(p: string | null): string {
+  if (!p) return "";
+  const rent = p.trim().replace(/^(per|\/|i)\s*/i, "").trim();
+  return rent ? ` per ${rent}` : "";
+}
+
 /** Registry figures arrive in tkr. Nobody says "forty-five thousand tkr" out
  *  loud, so convert to the unit a person would actually speak. */
 function omsattning(tkr: number, svensk: boolean): string {
@@ -61,11 +69,17 @@ function byggManus(rapport: Rapport): string {
   const prissatta = rapport.konkurrenter.filter((k) => k.priser.length > 0).slice(0, 2);
   for (const k of prissatta) {
     const p = k.priser[0];
-    const period = p.period ? ` per ${p.period}` : "";
+    // A free tier is a real finding, but "charges 0 kr for their Free" is not
+    // a sentence anyone says.
+    const gratis = /^(0([.,]0+)?\s*(kr|sek|:-)?|gratis|free)$/i.test(p.pris.trim());
     fynd.push(
-      svensk
-        ? `${k.namn} tar ${p.pris}${period} för sin ${p.namn}.`
-        : `${k.namn} charges ${p.pris}${period} for their ${p.namn}.`,
+      gratis
+        ? svensk
+          ? `${k.namn} ger bort sin ${p.namn}-nivå gratis.`
+          : `${k.namn} gives their ${p.namn} tier away free.`
+        : svensk
+          ? `${k.namn} tar ${p.pris}${period(p.period)} för sin ${p.namn}.`
+          : `${k.namn} charges ${p.pris}${period(p.period)} for their ${p.namn}.`,
     );
   }
 
@@ -101,7 +115,9 @@ function byggManus(rapport: Rapport): string {
   const ordningsord = svensk ? ["Ett,", "Två,", "Och tre,"] : ["One,", "Two,", "And three,"];
   const punkter = [a1, a2, a3]
     .filter(Boolean)
-    .map((a, n) => `${ordningsord[n]} ${a.replace(/\.$/, "")}.`)
+    // korta() may already have ended the clause with an ellipsis; a full stop
+    // on top of it reads as a stumble when spoken.
+    .map((a, n) => `${ordningsord[n]} ${/[.!?…]$/.test(a) ? a : `${a}.`}`)
     .join(" ");
   const atgarder = punkter
     ? svensk
@@ -143,7 +159,7 @@ export async function POST(req: Request) {
   const manus = byggManus(sparad.rapport);
   const svensk = arSvensk(sparad.rapport.egen);
   // Characters are the ElevenLabs meter, so log what each play actually costs.
-  console.log(`[rost] ${manus.length} characters, ${svensk ? "sv" : "en"}: ${manus}`);
+  console.log(`[rost] ${manus.length} characters, ${svensk ? "sv" : "en"}`);
 
   try {
     const ljud = await talSyntes(manus, { sprak: svensk ? "sv" : "en" });
