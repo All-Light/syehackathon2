@@ -14,6 +14,17 @@ type Fas = "start" | "arbetar" | "klar";
  */
 type Korningshandelse = { typ: "korning"; id: string };
 
+/**
+ * The headline's last word, cycled. Each one is a column the report genuinely
+ * fills in — published prices, the positioning line, the feature scope, the
+ * weaknesses you can attack, the filed revenue — so the hero states the
+ * coverage instead of a feature list nobody scrolls to.
+ */
+const SLUTORD = ["charge", "promise", "ship", "miss", "earn"];
+
+/** Seconds each word holds the slot. The loop is this times the word count. */
+const VAXELTID = 2.6;
+
 function arKorning(h: unknown): h is Korningshandelse {
   if (typeof h !== "object" || h === null) return false;
   const k = h as { typ?: unknown; id?: unknown };
@@ -143,7 +154,34 @@ export default function Sida() {
         <div className="flex flex-col gap-5">
           <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">Sweep</span>
           <h1 className="font-serif text-5xl leading-[1.08] text-black sm:text-6xl">
-            Know what your competitors charge.
+            Know what your competitors{" "}
+            {/* Amber marks the part of the sentence that varies, the same way
+                Arbetsvy marks the company name it just read. The words are
+                stacked in one inline-grid cell, so the box is already as wide
+                as the longest of them and the line cannot jump as they swap;
+                the full stop travels with each word so it never drifts. */}
+            <em className="vaxelord inline-grid not-italic text-amber">
+              {SLUTORD.map((ord, i) => (
+                <span
+                  key={ord}
+                  // The first word is the real sentence for a screen reader,
+                  // which has no way to watch the rest take their turn.
+                  aria-hidden={i > 0}
+                  className="col-start-1 row-start-1"
+                  // Base state, not the animation: what a reduced-motion
+                  // reader is left with once the animation is switched off.
+                  style={{
+                    opacity: i === 0 ? 1 : 0,
+                    animation: `vaxelord ${SLUTORD.length * VAXELTID}s ease-in-out ${(
+                      i * VAXELTID
+                    ).toFixed(2)}s infinite`,
+                  }}
+                >
+                  {ord}
+                  <span className="text-black">.</span>
+                </span>
+              ))}
+            </em>
           </h1>
           <p className="max-w-lg text-lg leading-relaxed text-dampad">
             Paste your website. The agent works out who you actually compete with —

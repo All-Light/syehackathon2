@@ -167,3 +167,44 @@ html {
     display: block;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The hero's last word. Each word in the loop is one column the report actually
+   fills in, so the headline names the coverage instead of a feature list.
+
+   One keyframe drives all of them and only animation-delay differs: a word
+   holds its slot, rises out, waits below the line while the others take their
+   turn, and rises back in exactly as the last one leaves. The exit and entry
+   are the same 0.3em rise as `stig`, so the page has one motion idiom.
+   --------------------------------------------------------------------------- */
+@keyframes vaxelord {
+  0%,
+  16% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 0;
+    transform: translateY(-0.3em);
+  }
+  /* Invisible here, so moving back below the line costs the reader nothing. */
+  21%,
+  96% {
+    opacity: 0;
+    transform: translateY(0.3em);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The global reduce rule only shortens animations, which would stack all five
+   words on top of each other for the frame before they revert. This is a
+   sentence, not decoration, so drop the animation entirely and let the first
+   word stand still — the inline opacity underneath keeps the rest hidden. */
+@media (prefers-reduced-motion: reduce) {
+  .vaxelord > span {
+    animation: none !important;
+  }
+}
