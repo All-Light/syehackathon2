@@ -864,15 +864,19 @@ export function Etablering({ konkurrenter, egen = null, egetNamn }: Sektorprops)
               <g key={`entre-${p.namn}`}>
                 <title>{`${p.namn} — registered ${p.ar}`}</title>
                 {/* A leader from the name to its dot. The rows are far apart and the
-                    axis is wide; without it the eye loses the row halfway across. */}
-                <line
-                  x1={ranna + 8}
-                  y1={y}
-                  x2={x - 9}
-                  y2={y}
-                  stroke="var(--linje)"
-                  strokeWidth="1"
-                />
+                    axis is wide; without it the eye loses the row halfway across.
+                    The oldest company can sit on the axis start, where there is no
+                    distance to lead across and a line would double back. */}
+                {x - 9 > ranna + 10 && (
+                  <line
+                    x1={ranna + 8}
+                    y1={y}
+                    x2={x - 9}
+                    y2={y}
+                    stroke="var(--linje)"
+                    strokeWidth="1"
+                  />
+                )}
                 <text
                   x={ranna}
                   y={y + 4}

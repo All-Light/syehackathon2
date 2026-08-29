@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Epost from "@/components/Epost";
 import Falt from "@/components/Falt";
+import Sektor from "@/components/Sektor";
 import { belopp } from "@/lib/diagram";
 import { byggKrok } from "@/lib/krok";
 import type { Forandring, Konkurrent, Rapport } from "@/lib/types";
@@ -171,6 +172,12 @@ export default function Bevakningsvy({
             </ol>
           )}
         </section>
+
+        <Sektor
+          konkurrenter={rapport.konkurrenter}
+          egen={rapport.egen_djup}
+          egetNamn={rapport.egen.namn}
+        />
 
         <section className="flex flex-col gap-4">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
