@@ -9,6 +9,13 @@ export type Prisniva = {
 };
 
 /** From the Swedish company register. The thing no US competitor tool can say. */
+/** One filed year. The registers publish five, which is a trend. */
+export type Bokslutsar = {
+  ar: number;
+  omsattningTkr: number | null;
+  resultatTkr: number | null;
+};
+
 export type Orgdata = {
   orgnr: string | null;
   omsattningTkr: number | null;
@@ -16,6 +23,8 @@ export type Orgdata = {
   anstallda: number | null;
   tillvaxtProcent: number | null;
   ar: number | null;
+  /** Newest first. Empty when only a single year could be read. */
+  historik: Bokslutsar[];
   kalla: Kalla | null;
 };
 
@@ -169,6 +178,8 @@ export type Fullrapport = {
   ogonblick: string[];
   avsnitt: Avsnitt[];
   positioner: Position[];
+  /** Filed revenue over time, per competitor that files. Newest first. */
+  tillvaxt: { konkurrent: string; serie: Bokslutsar[] }[];
   /** Why these competitors and not others — so the selection is checkable. */
   urval: string;
   metod: string;

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Betala from "@/components/Betala";
 import Djupdyk from "@/components/Djupdyk";
-import Fullrapport from "@/components/Fullrapport";
 import Lyssna from "@/components/Lyssna";
 import { Framsida, Kallor } from "@/components/Tryck";
 import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
@@ -418,15 +417,27 @@ export default function Rapportvy({
         </footer>
       )}
 
-      {id && (
-        <Fullrapport
-          id={id}
-          befintlig={rapport.full}
-          // On a development server the writing is testable without paying;
-          // NODE_ENV is inlined at build time, so a production build never gets
-          // this branch.
-          kanKopa={betald || process.env.NODE_ENV !== "production"}
-        />
+      {id && (betald || rapport.full || process.env.NODE_ENV !== "production") && (
+        <section className="ej-tryck flex flex-col gap-3 border-t border-linje pt-12">
+          <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+            The full report
+          </h2>
+          <p className="max-w-lg text-[15px] leading-relaxed text-dampad">
+            {rapport.full
+              ? "Five arguments, the positioning map, and a note on why these competitors and not others."
+              : "One answer, argued in five parts, with every claim marked by how far it sits from the page it came from. Two to four minutes."}
+          </p>
+          {/* Its own tab: it is a different document from this one, and a
+              reader who opens it should not lose their place here. */}
+          <a
+            href={`/r/${id}/full`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 self-start border border-black px-5 py-2.5 text-sm text-black transition-colors hover:bg-black hover:text-papper"
+          >
+            {rapport.full ? "Open the full report" : "Write the full report"}
+          </a>
+        </section>
       )}
 
       {id && !betald && (

@@ -4,6 +4,7 @@ import { parallellt } from "../firecrawl";
 import { skrivandeModell, struktur } from "../llm";
 import type {
   Avsnitt,
+  Bokslutsar,
   FullHandelse,
   Fullrapport,
   Kalla,
@@ -42,6 +43,18 @@ const ARGUMENT: { id: string; rubrik: string; uppdrag: string }[] = [
     rubrik: "Momentum",
     uppdrag:
       "Who is growing and who is not, read from public filings, headcount, hiring, funding and what they have shipped recently. Say plainly where the evidence runs out — a competitor with no filings is not thereby small.",
+  },
+  {
+    id: "marknad",
+    rubrik: "How the market is arranged",
+    uppdrag:
+      "How does this market divide up, and who serves which part of it? Which competitors cluster together and which sit alone; where the crowding is and where nobody is; who a customer actually chooses between when they are choosing. Name the segments in the market's own terms, not in abstractions.",
+  },
+  {
+    id: "drag",
+    rubrik: "Where you win, and what it would take",
+    uppdrag:
+      "Given everything the other sections establish, where can the company you advise actually win, and what would it cost them to do it? Be specific about the move and honest about the price of making it. This is the section the owner acts on, so no hedging and no generic advice that would fit any company.",
   },
 ];
 
@@ -127,6 +140,15 @@ function underlag(k: Konkurrent): string {
     k.orgdata
       ? `Filings: revenue ${k.orgdata.omsattningTkr ?? "?"} tkr (${k.orgdata.ar ?? "?"}), ${k.orgdata.anstallda ?? "?"} employees [${k.orgdata.kalla?.url ?? ""}]`
       : "Filings: none found under this name",
+    k.orgdata?.historik.length
+      ? `Filed revenue by year (tkr): ${k.orgdata.historik
+          .map((h) => `${h.ar} ${h.omsattningTkr ?? "?"}`)
+          .join(", ")}${
+          k.orgdata.tillvaxtProcent !== null
+            ? `. Latest year-on-year: ${k.orgdata.tillvaxtProcent}%`
+            : ""
+        }`
+      : "Filed revenue by year: not available",
   ];
 
   if (k.djup) {
@@ -168,9 +190,11 @@ ${rapport.konkurrenter.map(underlag).join("\n\n")}
 - "rubrik" states the CONCLUSION, not the topic. "Three of four hide their price,
   which is your opening" — not "Pricing analysis". A heading that stays true when
   the underlying numbers change is the wrong heading.
-- "brodtext": 200-350 words of prose the owner can act on. Every number carries
-  a consequence — say what it means for them, not just what it is. No bullet
-  lists, no headings inside the text.
+- "brodtext": 500-750 words of prose the owner can act on. This is a section of
+  a printed report, not a summary of one — argue the point properly, work
+  through the specific competitors by name, and follow each claim to what it
+  means for them. Every number carries a consequence. Write in paragraphs; no
+  bullet lists and no headings inside the text.
 - "tillit": "verifierat" if the section rests on quoted pages or filings;
   "harlett" if it follows from combining verified facts; "bedomning" if it is
   your reading and a reasonable person could disagree. Be honest — a section
@@ -184,7 +208,7 @@ ${rapport.konkurrenter.map(underlag).join("\n\n")}
 Answer with ONLY valid JSON, no prose, no markdown fence:
 {"rubrik":"","brodtext":"","tillit":"verifierat","kallor":[{"citat":"","url":""}]}`,
     AvsnittSchema,
-    { timeoutMs: 150_000, niva: "skrivande", forsok: 1 },
+    { timeoutMs: 200_000, niva: "skrivande", forsok: 1 },
   ).catch((e) => {
     console.error(`[full] ${arg.id}:`, e instanceof Error ? e.message : e);
     return null;
@@ -235,35 +259,56 @@ export async function* skrivFullrapport(
       typ: "steg",
       text: `Researching ${saknar.length} competitor${saknar.length > 1 ? "s" : ""} in depth first`,
     };
-    await parallellt(saknar, 3, async (k) => {
+
+    // Fifteen researchers are about to work for two minutes. Swallowing their
+    // progress leaves the reader watching four lines crawl past, so pass it up:
+    // the work is the only thing that makes the wait tolerable.
+    const ko: string[] = [];
+    const arbete = parallellt(saknar, 3, async (k) => {
       for await (const h of djupdyk(rapport.egen, k, svensk)) {
+        if (h.typ === "steg") ko.push(`${k.namn} · ${h.text}`);
+        if (h.typ === "vinkel") {
+          ko.push(`${k.namn} · ${h.vinkel.rubrik}: ${h.vinkel.fynd.length} findings`);
+        }
         if (h.typ === "klar") {
           const i = konkurrenter.findIndex((x) => x.url === k.url);
           if (i >= 0) konkurrenter[i] = { ...konkurrenter[i], djup: h.djup };
+          ko.push(`${k.namn} · done`);
         }
       }
     });
+
+    for (;;) {
+      const klar = await Promise.race([arbete.then(() => true), paus()]);
+      while (ko.length) yield { typ: "steg", text: ko.shift()! };
+      if (klar === true) break;
+    }
     yield { typ: "steg", text: "Deep research done" };
   }
 
   const medDjup: Rapport = { ...rapport, konkurrenter };
 
-  yield { typ: "steg", text: "Writing the three arguments" };
+  yield { typ: "steg", text: `Writing the ${ARGUMENT.length} arguments` };
+  for (const a of ARGUMENT) yield { typ: "steg", text: `Writing: ${a.rubrik}` };
 
-  const ko: Avsnitt[] = [];
-  const arbete = parallellt(ARGUMENT, 3, async (a) => {
+  const kön: { avsnitt: Avsnitt; etikett: string }[] = [];
+  const skrivning = parallellt(ARGUMENT, ARGUMENT.length, async (a) => {
     const avsnitt = await skrivAvsnitt(a, medDjup, svensk);
-    ko.push(avsnitt);
+    kön.push({ avsnitt, etikett: a.rubrik });
     return avsnitt;
   });
 
   for (;;) {
-    const klar = await Promise.race([arbete.then(() => true), paus()]);
-    while (ko.length) yield { typ: "avsnitt", avsnitt: ko.shift()! };
+    const klar = await Promise.race([skrivning.then(() => true), paus()]);
+    while (kön.length) {
+      const { avsnitt, etikett } = kön.shift()!;
+      yield { typ: "steg", text: `Done: ${etikett}` };
+      yield { typ: "avsnitt", avsnitt };
+    }
     if (klar === true) break;
   }
 
-  const avsnitt = await arbete;
+  const avsnitt = await skrivning;
 
   yield { typ: "steg", text: "Drawing the conclusion" };
 
@@ -275,7 +320,7 @@ ${sprakInstruktion(svensk)}
 # The company
 ${rapport.egen.namn} — ${rapport.egen.vadNiSaljer}, sold to ${rapport.egen.malgrupp} in ${rapport.egen.geografi}
 
-# The three arguments, already written
+# The arguments, already written
 ${avsnitt.map((a) => `## ${a.rubrik} (${a.tillit})\n${a.brodtext}`).join("\n\n")}
 
 # What was already agreed
@@ -303,14 +348,20 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
     skapad: new Date().toISOString(),
     skrivenAv: await skrivandeModell(),
     slutsats: topp.slutsats,
-    ogonblick: topp.ogonblick.slice(0, 5),
+    ogonblick: topp.ogonblick.slice(0, 6),
     avsnitt,
     positioner: positioner(konkurrenter),
+    tillvaxt: konkurrenter
+      .filter((k) => (k.orgdata?.historik.length ?? 0) >= 2)
+      .map((k) => ({
+        konkurrent: k.namn,
+        serie: k.orgdata!.historik as Bokslutsar[],
+      })),
     // Stated in code, not written by a model: the reader needs the real rule.
     urval: `The agent searched for companies selling ${rapport.egen.vadNiSaljer.toLowerCase()} to ${rapport.egen.malgrupp.toLowerCase()}, then read the ${konkurrenter.length} it ranked most likely to compete for the same customers${
       namngivna ? `, naming a further ${namngivna} without reading them` : ""
     }. Directories, comparison sites and news articles were excluded. A competitor absent from search results is absent from this report.`,
-    metod: `Every price and feature here was read from the competitor's own pages on ${new Date().toLocaleDateString("sv-SE")} and is quoted in the sources. Company figures come from Swedish public filings, which lag the present by up to a year, are not audited by Bolagsverket, and exist only for aktiebolag — a competitor with no figures is not thereby small. Claims are labelled Verified where they rest on a quoted page, Derived where they follow from combining verified facts, and Judgement where a reasonable person could disagree. On the positioning chart, price is the median of what a company publishes — not its cheapest tier, which for a vendor with a low add-on fee would put them below everyone — and breadth is a rank within this set of competitors rather than an absolute score.`,
+    metod: `Every price and feature here was read from the competitor's own pages on ${new Date().toLocaleDateString("sv-SE")} and is quoted in the sources. Company figures come from Swedish public filings, which lag the present by up to a year, are not audited by Bolagsverket, and exist only for aktiebolag — a competitor with no figures is not thereby small. Claims are labelled Verified where they rest on a quoted page, Derived where they follow from combining verified facts, and Judgement where a reasonable person could disagree. Revenue by year comes from the accounts each company has filed, five years where five exist; a competitor that files nothing appears in no growth figure, which is a gap in the evidence and not a finding about their size. We do not state a market size: the honest public proxies for it are counts of registered companies, which are not the same thing, and an invented number would undermine everything else here. On the positioning chart, price is the median of what a company publishes — not its cheapest tier, which for a vendor with a low add-on fee would put them below everyone — and breadth is a rank within this set of competitors rather than an absolute score.`,
   };
 
   yield { typ: "klar", full };

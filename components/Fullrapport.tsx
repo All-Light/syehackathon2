@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 // Aliased because the component below owns the name `Fullrapport` in this module.
 import type {
   Avsnitt,
+  Bokslutsar,
   Fullrapport as Fulldata,
   FullHandelse,
   Kalla,
@@ -147,7 +148,9 @@ function kort(s: string, n = 18) {
 }
 
 function tal(v: number) {
-  return v.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+  const n = Math.abs(v);
+  const decimaler = n === 0 || n >= 10 ? 1 : n >= 1 ? 2 : 3;
+  return v.toLocaleString("en-GB", { maximumFractionDigits: decimaler });
 }
 
 /** Push labels apart so no two overlap, then keep the column inside the plot. */
@@ -446,6 +449,403 @@ function Karta({ positioner }: { positioner: Position[] }) {
   );
 }
 
+/* ---------------------------------------------------------------------------
+   Filed revenue over time. Small multiples rather than one shared chart: these
+   companies sit one to three orders of magnitude apart — a 1.8 bn SEK incumbent
+   beside a 1.2 MSEK one-person shop — and on a single linear axis everyone but
+   the largest collapses onto the baseline. Indexing every series to 100 at its
+   own first filed year was the alternative and was rejected: the series start in
+   different years and run for different lengths, so a common base would be a
+   fiction, and indexing throws absolute size away entirely. So each panel keeps
+   its own zero-based scale (shape is comparable across panels, height is not —
+   each panel prints its own ceiling), the year axis is shared so time lines up,
+   the headline figure carries absolute size, and growth is stated per year
+   rather than as a total because the spans differ. One hue throughout: identity
+   comes from the panel heading, never from a colour.
+   --------------------------------------------------------------------------- */
+
+type Tillvaxtserie = { konkurrent: string; serie: Bokslutsar[] };
+
+/** tkr is unreadable at a billion, so the number picks its own unit. */
+function belopp(tkr: number) {
+  const msek = tkr / 1000;
+  if (Math.abs(msek) >= 1000) return `${(msek / 1000).toFixed(2)} bn SEK`;
+  if (Math.abs(msek) >= 100) return `${tal(Math.round(msek))} MSEK`;
+  // Below a million kronor, MSEK stops being readable — say it in tkr.
+  if (Math.abs(msek) < 1) return `${tal(tkr)} tkr`;
+  return `${tal(msek)} MSEK`;
+}
+
+function procent(v: number) {
+  const n = Math.abs(v);
+  // A tenth of a percent is noise once the change is in the hundreds.
+  return `${v >= 0 ? "+" : "−"}${tal(n >= 100 ? Math.round(n) : n)}%`;
+}
+
+/** The register hands us newest first; a chart reads left to right. */
+function kronologisk(serie: Bokslutsar[]) {
+  return [...serie].sort((a, b) => a.ar - b.ar);
+}
+
+type Punkt = { ar: number; v: number };
+
+/**
+ * Unbroken runs of filed revenue. A null year — or a year simply missing from
+ * the filing list — ends the run rather than being bridged, because a straight
+ * line through a gap claims a number nobody filed.
+ */
+function segment(rader: Bokslutsar[]) {
+  const ut: Punkt[][] = [];
+  let nu: Punkt[] = [];
+  for (const r of rader) {
+    const forra = nu[nu.length - 1];
+    if (r.omsattningTkr === null || (forra && r.ar !== forra.ar + 1)) {
+      if (nu.length) ut.push(nu);
+      nu = [];
+    }
+    if (r.omsattningTkr !== null) nu.push({ ar: r.ar, v: r.omsattningTkr });
+  }
+  if (nu.length) ut.push(nu);
+  return ut;
+}
+
+/** Only holes inside a company's own filed span count — years before it filed are not gaps. */
+function luckor(rader: Bokslutsar[], forsta: number, sista: number) {
+  const ut: number[] = [];
+  for (let ar = forsta + 1; ar < sista; ar++) {
+    const rad = rader.find((r) => r.ar === ar);
+    if (!rad || rad.omsattningTkr === null) ut.push(ar);
+  }
+  return ut;
+}
+
+type Analys = {
+  namn: string;
+  rader: Bokslutsar[];
+  punkter: Punkt[];
+  /** Per year, not total, so competitors with different spans can be compared. */
+  arligt: number | null;
+  /** Over that competitor's own span. Lives in the table, where the span is stated. */
+  totalt: number | null;
+};
+
+function analysera(s: Tillvaxtserie): Analys {
+  const rader = kronologisk(s.serie);
+  const punkter = rader
+    .filter((r): r is Bokslutsar & { omsattningTkr: number } => r.omsattningTkr !== null)
+    .map((r) => ({ ar: r.ar, v: r.omsattningTkr }));
+  const forsta = punkter[0];
+  const sista = punkter[punkter.length - 1];
+  const matbart = !!forsta && !!sista && forsta.v > 0 && sista.ar > forsta.ar;
+  return {
+    namn: s.konkurrent,
+    rader,
+    punkter,
+    arligt: matbart
+      ? ((sista.v / forsta.v) ** (1 / (sista.ar - forsta.ar)) - 1) * 100
+      : null,
+    totalt: matbart ? (sista.v / forsta.v - 1) * 100 : null,
+  };
+}
+
+function Kurva({
+  analys,
+  minAr,
+  maxAr,
+  aktiv,
+}: {
+  analys: Analys;
+  minAr: number;
+  maxAr: number;
+  aktiv: boolean;
+}) {
+  const B = 260;
+  const H = 104;
+  const x0 = 6;
+  const x1 = B - 6;
+  const y1 = 20;
+  const y0 = 78;
+
+  const spann = Math.max(maxAr - minAr, 1);
+  const xAv = (ar: number) => x0 + ((ar - minAr) / spann) * (x1 - x0);
+
+  const topp = analys.punkter.reduce((m, p) => Math.max(m, p.v), 0);
+  // Thirds rather than halves: a coarser step rounds a panel's ceiling so far above
+  // its peak that the curve sinks into the lower half and reads as flat.
+  const steg = snyggtSteg(Math.max(topp, 1) / 3);
+  const tak = Math.max(steg * Math.ceil(Math.max(topp, 1) / steg), steg);
+  const yAv = (v: number) => y0 - (v / tak) * (y0 - y1);
+
+  const bitar = segment(analys.rader);
+  const forsta = analys.punkter[0];
+  const sist = analys.punkter[analys.punkter.length - 1];
+  const hal = forsta && sist ? luckor(analys.rader, forsta.ar, sist.ar) : [];
+
+  return (
+    // The table below carries every value, so the drawing is hidden from a screen
+    // reader rather than read out as a second, worse copy of the same data.
+    <svg
+      viewBox={`0 0 ${B} ${H}`}
+      width="100%"
+      aria-hidden="true"
+      className="h-auto w-full overflow-visible"
+    >
+      <title>{`${analys.namn} — filed revenue ${minAr}–${maxAr}`}</title>
+
+      {/* The ceiling is printed because every panel is scaled to itself. */}
+      <text x={x0} y={y1 - 7} fontSize="10" fill="var(--dampad)" style={{ fontVariantNumeric: "tabular-nums" }}>
+        {belopp(tak)}
+      </text>
+
+      {/* A year nobody filed: a rule where the line is not. Never bridged. */}
+      {hal.map((ar) => (
+        <line
+          key={`lucka-${ar}`}
+          x1={xAv(ar)}
+          y1={y1}
+          x2={xAv(ar)}
+          y2={y0}
+          stroke="var(--linje)"
+          strokeWidth="1"
+        />
+      ))}
+
+      <line x1={x0} y1={y0} x2={x1} y2={y0} stroke="var(--linje)" strokeWidth="1" />
+
+      {bitar.map((bit, n) => {
+        if (bit.length < 2) return null;
+        const punkter = bit.map((p) => `${xAv(p.ar)},${yAv(p.v)}`).join(" ");
+        const yta = `M ${xAv(bit[0].ar)},${y0} L ${punkter.replaceAll(" ", " L ")} L ${xAv(bit[bit.length - 1].ar)},${y0} Z`;
+        return (
+          <g key={`bit-${n}`}>
+            <path d={yta} fill="var(--amber)" fillOpacity="0.1" />
+            <polyline
+              points={punkter}
+              fill="none"
+              stroke="var(--amber)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </g>
+        );
+      })}
+
+      {analys.punkter.map((p, n) => {
+        const slut = n === analys.punkter.length - 1;
+        return (
+          <circle
+            key={`p-${p.ar}`}
+            cx={xAv(p.ar)}
+            cy={yAv(p.v)}
+            r={slut ? (aktiv ? 5 : 4) : 2.5}
+            fill="var(--amber)"
+            stroke={slut ? "var(--papper)" : "none"}
+            strokeWidth={slut ? 2 : 0}
+          />
+        );
+      })}
+
+      {[minAr, maxAr].map((ar, n) => (
+        <text
+          key={`ar-${ar}`}
+          x={n === 0 ? x0 : x1}
+          y={y0 + 16}
+          textAnchor={n === 0 ? "start" : "end"}
+          fontSize="10"
+          fill="var(--dampad)"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {ar}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function Tillvaxttabell({
+  analyser,
+  ar,
+  hovrad,
+  sattHovrad,
+}: {
+  analyser: Analys[];
+  ar: number[];
+  hovrad: string | null;
+  sattHovrad: (n: string | null) => void;
+}) {
+  function cell(v: number | null) {
+    return v === null ? (
+      <span className="text-dampad">—</span>
+    ) : (
+      <span className="siffror text-black">{tal(v / 1000)}</span>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto print:overflow-visible">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-linje text-[10px] uppercase tracking-[0.12em] text-dampad">
+            <th className="py-2 pr-3 font-normal">Competitor</th>
+            <th className="py-2 pr-3 font-normal">Figure, MSEK</th>
+            {ar.map((a) => (
+              <th key={a} className="siffror py-2 pl-3 text-right font-normal">
+                {a}
+              </th>
+            ))}
+            <th className="py-2 pl-3 text-right font-normal">Change over span</th>
+          </tr>
+        </thead>
+        <tbody>
+          {analyser.map((a) => {
+            const markerad = hovrad === a.namn;
+            const rad = (
+              typ: "omsattning" | "resultat",
+            ) => (
+              <tr
+                key={`${a.namn}-${typ}`}
+                onMouseEnter={() => sattHovrad(a.namn)}
+                onMouseLeave={() => sattHovrad(null)}
+                className={`${typ === "resultat" ? "border-b border-linje" : ""} ${
+                  markerad ? "bg-papper-djup" : ""
+                }`}
+              >
+                {typ === "omsattning" ? (
+                  <td rowSpan={2} className="py-2 pr-3 align-top text-black">
+                    {a.namn}
+                  </td>
+                ) : null}
+                <td className="py-2 pr-3 text-dampad">
+                  {typ === "omsattning" ? "Revenue" : "Profit/loss"}
+                </td>
+                {ar.map((y) => {
+                  const r = a.rader.find((x) => x.ar === y);
+                  return (
+                    <td key={y} className="py-2 pl-3 text-right">
+                      {cell(r ? (typ === "omsattning" ? r.omsattningTkr : r.resultatTkr) : null)}
+                    </td>
+                  );
+                })}
+                <td className="py-2 pl-3 text-right">
+                  {typ === "omsattning" && a.totalt !== null ? (
+                    <span className="siffror text-black">{procent(a.totalt)}</span>
+                  ) : (
+                    <span className="text-dampad">—</span>
+                  )}
+                </td>
+              </tr>
+            );
+            return [rad("omsattning"), rad("resultat")];
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Tillvaxt({ tillvaxt }: { tillvaxt: Tillvaxtserie[] }) {
+  const [hovrad, sattHovrad] = useState<string | null>(null);
+
+  const analyser = tillvaxt
+    .map(analysera)
+    .filter((a) => a.rader.length > 0)
+    // Fastest grower first: the exhibit is about rate, so the ranking should be too.
+    .sort((a, b) => (b.arligt ?? -Infinity) - (a.arligt ?? -Infinity));
+
+  if (!analyser.length) return null;
+
+  const arSet = new Set<number>();
+  for (const a of analyser) for (const r of a.rader) arSet.add(r.ar);
+  const ar = [...arSet].sort((a, b) => a - b);
+  const minAr = ar[0];
+  const maxAr = ar[ar.length - 1];
+
+  const ritbara = analyser.filter((a) => a.punkter.length >= 2);
+
+  return (
+    <figure className="tryck-hel m-0 flex flex-col gap-6">
+      {ritbara.length > 0 ? (
+        <div className="grid gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+          {analyser.map((a) => {
+            const sist = a.punkter[a.punkter.length - 1];
+            return (
+              <div
+                key={a.namn}
+                onMouseEnter={() => sattHovrad(a.namn)}
+                onMouseLeave={() => sattHovrad(null)}
+                className={`tryck-hel flex flex-col gap-1.5 border-t-2 pt-3 transition-colors ${
+                  hovrad === a.namn ? "border-amber" : "border-linje"
+                }`}
+              >
+                <span className="text-[13px] leading-snug text-black">{a.namn}</span>
+                {/* Proportional figures: a standalone value, not a column to align. */}
+                <span className="text-[19px] leading-none text-black">
+                  {sist ? belopp(sist.v) : "—"}
+                </span>
+                <span className="text-[12px] leading-snug text-dampad">
+                  {a.arligt === null ? (
+                    a.punkter.length ? (
+                      `One year filed · ${sist.ar}`
+                    ) : (
+                      "No revenue figure filed"
+                    )
+                  ) : (
+                    <>
+                      <span className={a.arligt >= 0 ? "text-black" : "text-rod"}>
+                        {procent(a.arligt)} a year
+                      </span>
+                      {` · ${a.punkter[0].ar}–${sist.ar}`}
+                    </>
+                  )}
+                </span>
+                <div className="mt-1.5">
+                  {a.punkter.length >= 2 ? (
+                    <Kurva
+                      analys={a}
+                      minAr={minAr}
+                      maxAr={maxAr}
+                      aktiv={hovrad === a.namn}
+                    />
+                  ) : (
+                    // An empty frame would imply we drew something. Say the thing instead.
+                    <p className="text-[12px] leading-snug text-dampad">
+                      Too few filed years to draw a line.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[15px] leading-relaxed text-dampad">
+          Every competitor that files has only a single readable year, so there is no
+          trend to draw. The filed figures are below.
+        </p>
+      )}
+
+      <Tillvaxttabell analyser={analyser} ar={ar} hovrad={hovrad} sattHovrad={sattHovrad} />
+
+      <figcaption className="text-[13px] leading-relaxed text-dampad">
+        Filed annual accounts from the Swedish company register, oldest year on the
+        left. Each panel has its own vertical scale and starts at zero, so the shapes
+        are comparable but the heights are not — every panel prints its own ceiling and
+        every figure is in the table. Growth is stated per year rather than as a total
+        because the series cover different numbers of years. Accounts are filed in
+        arrears and lag by up to a year, so the most recent year may be missing. A year
+        with no filed figure leaves a break in the line, marked by a faint rule; nothing
+        is interpolated across it. These figures exist only for Swedish aktiebolag — a
+        competitor missing from this exhibit is one that files nothing here, a foreign
+        parent, a branch, a partnership or a sole trader, which is not the same thing as
+        being small.
+      </figcaption>
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
 /* ------------------------------------------------------------------------- */
 
 function Rapport({ full }: { full: Fulldata }) {
@@ -491,6 +891,16 @@ function Rapport({ full }: { full: Fulldata }) {
         </section>
       )}
 
+      {(full.tillvaxt?.length ?? 0) > 0 && (
+        <section className="tryck-hel flex flex-col gap-6">
+          <h3 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+            Who is actually growing
+          </h3>
+          {/* Reports saved before this exhibit existed carry no `tillvaxt` at all. */}
+          <Tillvaxt tillvaxt={full.tillvaxt ?? []} />
+        </section>
+      )}
+
       <section className="tryck-hel grid gap-8 border-t border-linje pt-8 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <h3 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
@@ -517,10 +927,12 @@ function Rapport({ full }: { full: Fulldata }) {
 
 export default function Fullrapport({
   id,
+  namn,
   befintlig,
   kanKopa,
 }: {
   id: string;
+  namn: string;
   befintlig?: Fulldata | null;
   kanKopa: boolean;
 }) {
@@ -614,6 +1026,21 @@ export default function Fullrapport({
 
   if (visad && !arbetar) return <Rapport full={visad} />;
 
+  // The three arguments announce themselves as they start and finish, so the
+  // roster can be drawn from the progress lines rather than hardcoded here.
+  const vinklar: { etikett: string; klar: boolean }[] = [];
+  for (const r of rader) {
+    const start = r.match(/^Writing: (.+)$/);
+    if (start && !vinklar.some((v) => v.etikett === start[1])) {
+      vinklar.push({ etikett: start[1], klar: false });
+    }
+    const slut = r.match(/^Done: (.+)$/);
+    if (slut) {
+      const v = vinklar.find((x) => x.etikett === slut[1]);
+      if (v) v.klar = true;
+    }
+  }
+
   if (arbetar) {
     return (
       <section className="ej-tryck flex flex-col gap-10 border-t border-linje pt-12">
@@ -629,14 +1056,52 @@ export default function Fullrapport({
             <span className="siffror text-dampad"> · {sekunder}s</span>
           </span>
           <h2 className="font-serif text-3xl leading-tight text-black sm:text-4xl">
-            The full report is being written
+            Building the case for <em className="not-italic text-amber">{namn}</em>
           </h2>
           <p className="max-w-lg text-[15px] leading-relaxed text-dampad">
-            It reads every source again, decides what the answer is, and then argues for
-            it — one section at a time, each one landing here as it is finished. Two to
-            four minutes. You can leave this open.
+            Researchers read every competitor from five angles, then three writers argue
+            the case in parallel and the conclusion is drawn over them. Two to four
+            minutes. You can leave this open.
           </p>
         </div>
+
+        {vinklar.length > 0 && (
+          <ul className="flex flex-wrap gap-2">
+            {vinklar.map((v) => (
+              <li
+                key={v.etikett}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors duration-500 ${
+                  v.klar
+                    ? "border-linje bg-papper-djup text-black"
+                    : "border-linje/70 bg-transparent text-dampad"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${v.klar ? "bg-amber" : "bg-linje"}`} />
+                {v.etikett}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {rader.length > 0 && (
+          <div className="flex max-h-64 flex-col gap-1.5 overflow-hidden">
+            {rader
+              .filter((r) => !/^(Writing|Done): /.test(r))
+              .slice(-9)
+              .map((r, i, alla) => (
+                <p
+                  key={`${r}-${i}`}
+                  className="siffror text-sm text-dampad"
+                  style={{
+                    opacity: 0.25 + (0.75 * (i + 1)) / alla.length,
+                    animation: "stig 0.4s ease-out both",
+                  }}
+                >
+                  {r}
+                </p>
+              ))}
+          </div>
+        )}
 
         {avsnitt.length > 0 && (
           <div className="flex flex-col gap-12 border-t border-linje pt-10">
@@ -648,22 +1113,6 @@ export default function Fullrapport({
           </div>
         )}
 
-        {rader.length > 0 && (
-          <div className="flex flex-col gap-1.5 overflow-hidden">
-            {rader.slice(-6).map((r, i, alla) => (
-              <p
-                key={`${r}-${i}`}
-                className="siffror text-sm text-dampad"
-                style={{
-                  opacity: 0.25 + (0.75 * (i + 1)) / alla.length,
-                  animation: "stig 0.4s ease-out both",
-                }}
-              >
-                {r}
-              </p>
-            ))}
-          </div>
-        )}
       </section>
     );
   }

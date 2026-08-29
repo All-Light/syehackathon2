@@ -1,6 +1,7 @@
 import { exaSok, harExa } from "../exa";
 import { skrapa, sok } from "../firecrawl";
-import type { Orgdata } from "../types";
+import type { Bokslutsar, Orgdata } from "../types";
+import { skrapa as skrapaSida } from "../firecrawl";
 
 const REGISTER = ["allabolag.se", "bolagsfakta.se", "ratsit.se", "proff.se"];
 const REGISTER_RE = /allabolag\.se|bolagsfakta\.se|ratsit\.se|proff\.se/;
@@ -40,6 +41,53 @@ function ombolaget(md: string, namn: string): boolean {
   return kandidater.some((k) => k.includes(sokt) || sokt.includes(k));
 }
 
+/**
+ * Five filed years, from the register's own accounts table:
+ *
+ *   | BOKSLUTSPERIOD | 2024-12 | 2023-12 | 2022-12 | ...
+ *   Omsättning | 1 796 000 | 1 438 000 | 1 098 000 | ...
+ *
+ * One year is a number; five is a trend, and a trend is the thing a competitor
+ * cannot hide behind a marketing page.
+ */
+export async function hamtaHistorik(orgnr: string): Promise<Bokslutsar[]> {
+  const rent = orgnr.replace(/\D/g, "");
+  if (rent.length !== 10) return [];
+
+  const sida = await skrapaSida(`https://www.allabolag.se/${rent}/bokslut`);
+  if (!sida) return [];
+
+  const md = sida.markdown;
+  const ar = md
+    .match(/BOKSLUTSPERIOD([^\n]*)/)?.[1]
+    ?.match(/(20\d\d)-\d\d/g)
+    ?.map((x) => Number(x.slice(0, 4)));
+  if (!ar?.length) return [];
+
+  const rad = (etikett: string): (number | null)[] => {
+    const träff = md.match(new RegExp(`${etikett}\\s*\\|([^\n]*)`));
+    if (!träff) return [];
+    return träff[1]
+      .split("|")
+      .slice(0, ar.length)
+      .map((c) => {
+        const n = Number(c.replace(/[\s  ]/g, "").replace(",", "."));
+        return Number.isFinite(n) && c.trim() ? n : null;
+      });
+  };
+
+  const oms = rad("Omsättning");
+  const res = rad("Resultat efter finansnetto");
+
+  return ar
+    .map((a, i) => ({
+      ar: a,
+      omsattningTkr: oms[i] ?? null,
+      resultatTkr: res[i] ?? null,
+    }))
+    .filter((r) => r.omsattningTkr !== null || r.resultatTkr !== null);
+}
+
 function plocka(md: string, url: string, namn: string): Orgdata | null {
   if (!ombolaget(md, namn)) {
     console.warn(`[orgdata] ${namn}: ${url} is about a different company — dropped`);
@@ -66,6 +114,7 @@ function plocka(md: string, url: string, namn: string): Orgdata | null {
     // in the text. Better absent than guessed.
     tillvaxtProcent: null,
     ar: oms?.[1] ? Number(oms[1]) : null,
+    historik: [],
     kalla: rad ? { url, citat: rad } : null,
   };
 }
@@ -90,7 +139,18 @@ export async function hamtaOrgdata(namn: string): Promise<Orgdata | null> {
       });
       for (const t of traffar) {
         const ut = t.text ? plocka(t.text, t.url, namn) : null;
-        if (ut) return ut;
+        if (!ut) continue;
+        if (ut.orgnr) {
+          ut.historik = await hamtaHistorik(ut.orgnr).catch(() => []);
+          // Five filed years give a real growth rate; a single year gives none.
+          const [nu, forra] = ut.historik;
+          if (nu?.omsattningTkr && forra?.omsattningTkr) {
+            ut.tillvaxtProcent = Math.round(
+              ((nu.omsattningTkr - forra.omsattningTkr) / forra.omsattningTkr) * 100,
+            );
+          }
+        }
+        return ut;
       }
     } catch (e) {
       console.error(`[orgdata] exa ${namn}:`, e instanceof Error ? e.message : e);
