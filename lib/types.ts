@@ -116,6 +116,8 @@ export type Rapport = {
   hot: Insikt[];
   luckor: Insikt[];
   atgarder: string[];
+  /** Absent until bought. */
+  full?: Fullrapport | null;
 };
 
 /** What the working view sees, streamed over SSE as the agent runs. */
@@ -125,6 +127,56 @@ export type Handelse =
   | { typ: "konkurrent"; konkurrent: Konkurrent }
   | { typ: "profil"; egen: Foretag }
   | { typ: "klar"; rapport: Rapport; id: string | null }
+  | { typ: "fel"; text: string };
+
+/**
+ * How far a claim is from the page it came from. Three labels, each with a
+ * mechanical rule, because a number would imply a precision we do not have.
+ */
+export type Tillit =
+  | "verifierat" // quoted from a page we fetched, or a public filing
+  | "harlett" // follows from two or more verified facts
+  | "bedomning"; // our reading; a reasonable person could disagree
+
+/** One argument in the full report. The heading states the conclusion. */
+export type Avsnitt = {
+  rubrik: string;
+  brodtext: string;
+  tillit: Tillit;
+  kallor: Kalla[];
+};
+
+/** Where each competitor sits on price against breadth — computed, not written. */
+export type Position = {
+  konkurrent: string;
+  prisPerManad: number | null;
+  bredd: number;
+  omsattningTkr: number | null;
+};
+
+/**
+ * The paid tier. Structured the way a strategy deliverable is: the governing
+ * answer first, then the arguments that hold it up, then the evidence — rather
+ * than a list of observations in the order we happened to find them.
+ */
+export type Fullrapport = {
+  skapad: string;
+  skrivenAv: string;
+  /** The one sentence the whole report exists to support. */
+  slutsats: string;
+  ogonblick: string[];
+  avsnitt: Avsnitt[];
+  positioner: Position[];
+  /** Why these competitors and not others — so the selection is checkable. */
+  urval: string;
+  metod: string;
+};
+
+/** Streamed while the full report is written. */
+export type FullHandelse =
+  | { typ: "steg"; text: string }
+  | { typ: "avsnitt"; avsnitt: Avsnitt }
+  | { typ: "klar"; full: Fullrapport }
   | { typ: "fel"; text: string };
 
 /** Streamed while the deep-dive researchers work. */

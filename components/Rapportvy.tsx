@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Betala from "@/components/Betala";
 import Djupdyk from "@/components/Djupdyk";
+import Fullrapport from "@/components/Fullrapport";
 import Lyssna from "@/components/Lyssna";
 import { Framsida, Kallor } from "@/components/Tryck";
 import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
@@ -418,6 +419,17 @@ export default function Rapportvy({
       )}
 
       {id && (
+        <Fullrapport
+          id={id}
+          befintlig={rapport.full}
+          // On a development server the writing is testable without paying;
+          // NODE_ENV is inlined at build time, so a production build never gets
+          // this branch.
+          kanKopa={betald || process.env.NODE_ENV !== "production"}
+        />
+      )}
+
+      {id && !betald && (
         <div className="ej-tryck">
           <Betala id={id} betald={betald} />
         </div>

@@ -30,13 +30,32 @@ export default function Betala({ id, betald }: { id: string; betald: boolean }) 
   if (betald) {
     return (
       <p className="border-t border-linje pt-8 text-sm text-dampad">
-        Paid — thank you. This report is yours to keep.
+        Paid — thank you. The full report is below, and this link keeps working.
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-linje pt-8">
+    <div className="flex flex-col gap-4 border-t border-linje pt-8">
+      <div className="flex flex-col gap-2">
+        <h2 className="font-serif text-2xl text-black">
+          What you have read so far is the summary.
+        </h2>
+        {/* A price with no idea of what it buys reads as a paywall. Say what
+            arrives, in the order a buyer cares about it. */}
+        <ul className="flex flex-col gap-1.5 text-[15px] text-dampad">
+          <li>
+            Five researchers on <em className="not-italic text-black">each</em> competitor —
+            business model, product, who they sell to, what customers say, company filings.
+          </li>
+          <li>
+            The argument written out: where the money is in this market, who can do what,
+            and who is actually growing.
+          </li>
+          <li>Every claim labelled Verified, Derived or Judgement, with its source.</li>
+          <li>A PDF you can file or send to your accountant.</li>
+        </ul>
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -44,7 +63,7 @@ export default function Betala({ id, betald }: { id: string; betald: boolean }) 
           disabled={laddar !== null}
           className="bg-amber px-5 py-2.5 text-sm text-papper transition-colors hover:bg-black disabled:opacity-50"
         >
-          {laddar === "rapport" ? "Opening checkout…" : "Buy this report — 490 SEK"}
+          {laddar === "rapport" ? "Opening checkout…" : "Buy the full report — 490 SEK"}
         </button>
         <button
           type="button"
