@@ -4,7 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PROJEKT="${VERCEL_PROJECT:-syehackathon}"
+# Named explicitly, never defaulted. A wrong name here re-links the directory
+# and deploys over whatever already lives at that project's domain.
+PROJEKT="${VERCEL_PROJECT:?set VERCEL_PROJECT to the target Vercel project}"
 
 # Only what the running app needs. SUPABASE_ACCESS_TOKEN is a personal admin
 # token that can run DDL on every project in the account — it belongs on this
