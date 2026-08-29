@@ -19,8 +19,8 @@ export type Plan = "rapport" | "bevakning";
 export const ORDINARIE_RAPPORT = 100_000;
 
 export const PRISER: Record<Plan, { belopp: number; namn: string; manatlig: boolean }> = {
-  rapport: { belopp: 50_000, namn: "Koll competitor report (early bird)", manatlig: false },
-  bevakning: { belopp: 29_000, namn: "Koll monitoring", manatlig: true },
+  rapport: { belopp: 50_000, namn: "Sweep competitor report (early bird)", manatlig: false },
+  bevakning: { belopp: 29_000, namn: "Sweep monitoring", manatlig: true },
 };
 
 /**

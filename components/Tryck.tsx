@@ -15,7 +15,7 @@ export function Framsida({ rapport }: { rapport: Rapport }) {
   return (
     <header className="endast-tryck tryck-hel" style={{ marginBottom: "10mm" }}>
       <p style={{ fontSize: "8.5pt", letterSpacing: "0.14em", textTransform: "uppercase", color: "#555" }}>
-        Competitor review · Koll
+        Competitor review · Sweep
       </p>
       <h1 style={{ fontSize: "26pt", lineHeight: 1.1, margin: "4mm 0 2mm" }}>
         {rapport.egen.namn}

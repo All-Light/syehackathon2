@@ -18,7 +18,7 @@ const ui = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Koll — keep tabs on your competitors",
+  title: "Sweep — keep tabs on your competitors",
   description:
     "Paste your website. Ninety seconds later you know what your competitors charge, what they promise and where they are weak.",
 };

@@ -141,7 +141,7 @@ export default function Sida() {
     <main className="flex min-h-dvh items-center bg-papper">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-6 py-16">
         <div className="flex flex-col gap-5">
-          <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">Koll</span>
+          <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">Sweep</span>
           <h1 className="font-serif text-5xl leading-[1.08] text-black sm:text-6xl">
             Know what your competitors charge.
           </h1>
