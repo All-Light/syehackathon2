@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Konto from "@/components/Konto";
+import { authKonfigurerad, hamtaAnvandare, taRapport } from "@/lib/auth";
 import { hamtaRapport } from "@/lib/rapporter";
 import Flikar from "./Flikar";
 
@@ -19,6 +21,12 @@ export default async function Rapportlayout({
 }) {
   const { id } = await params;
   const sparad = await hamtaRapport(id);
+  const anvandare = await hamtaAnvandare();
+
+  // A signed-in reader opening an unowned report takes it. The link was always
+  // the only claim to a report; an account is a durable one, and taRapport
+  // refuses anything already owned.
+  if (anvandare && sparad) await taRapport(id);
 
   // A run still in flight has no report yet, and no tabs to offer.
   if (!sparad) return <>{children}</>;
@@ -33,7 +41,10 @@ export default async function Rapportlayout({
           >
             {sparad.namn}
           </Link>
-          <Flikar id={id} harFull={Boolean(sparad.rapport.full)} />
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <Flikar id={id} harFull={Boolean(sparad.rapport.full)} />
+            <Konto epost={anvandare?.epost ?? null} aktiv={authKonfigurerad()} />
+          </div>
         </div>
       </div>
       {children}

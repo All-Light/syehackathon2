@@ -164,6 +164,34 @@ export async function hamtaMinaRapporter(grans = 50): Promise<MinRapport[]> {
 }
 
 /**
+ * Whether the Google provider is actually switched on in this project.
+ *
+ * Worth one round-trip before sending anybody to Google, because Supabase's
+ * answer to a disabled provider is a bare 400 on its own domain — the visitor
+ * lands on a json error page with no way back, which is a worse thing to show
+ * than a sentence. Asking first lets the refusal happen on our page instead.
+ *
+ * Returns null when the question could not be answered at all (auth down,
+ * request timed out). Callers treat null as "go ahead": a check that cannot
+ * run must not be the reason sign-in stops working.
+ */
+export async function googleAktiverad(): Promise<boolean | null> {
+  if (!URL || !NYCKEL) return false;
+  try {
+    const svar = await fetch(`${URL}/auth/v1/settings`, {
+      headers: { apikey: NYCKEL },
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+    if (!svar.ok) return null;
+    const data = (await svar.json()) as { external?: Record<string, boolean | undefined> };
+    return Boolean(data.external?.google);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Sanitises a `next=` parameter into a path we are willing to redirect to.
  *
  * An OAuth round-trip carries the return address through a third party, so it

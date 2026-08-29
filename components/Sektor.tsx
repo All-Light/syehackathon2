@@ -57,8 +57,12 @@ export type Sektorprops = {
 function filade(k: Konkurrent): Punkt[] {
   const o = k.orgdata;
   if (!o) return [];
-  const rader: Bokslutsar[] = o.historik.length
-    ? o.historik
+  // Reports written before this field existed simply have no `historik`, and
+  // the type cannot say so. A stored report is data from the past, not a value
+  // the current code produced.
+  const historik = o.historik ?? [];
+  const rader: Bokslutsar[] = historik.length
+    ? historik
     : o.ar !== null && o.omsattningTkr !== null
       ? [{ ar: o.ar, omsattningTkr: o.omsattningTkr, resultatTkr: o.resultatTkr }]
       : [];

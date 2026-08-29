@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authKlient, sakerVag } from "@/lib/auth";
+import { authKlient, googleAktiverad, sakerVag } from "@/lib/auth";
 
 /**
  * The Google round-trip, both ends of it.
@@ -59,6 +59,18 @@ export async function GET(begaran: Request) {
   // No code: this is the start of a sign-in, not the end of one. Building the
   // authorize url server-side is what writes the code verifier cookie.
   if (!kod) {
+    // Ask before sending anyone away: with the provider switched off, Supabase
+    // answers the authorize request with a bare 400 on its own domain, and the
+    // visitor is stranded there. `null` means the check itself failed, which is
+    // no reason to refuse a sign-in that might work.
+    if ((await googleAktiverad()) === false) {
+      return hem(
+        bas,
+        nasta,
+        "Google sign-in is not switched on for this deployment yet.",
+      );
+    }
+
     const { data, error } = await klient.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${bas}/auth/callback?next=${encodeURIComponent(nasta)}` },

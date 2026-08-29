@@ -151,11 +151,11 @@ function underlag(k: Konkurrent): string {
     k.orgdata
       ? `Filings: revenue ${k.orgdata.omsattningTkr ?? "?"} tkr (${k.orgdata.ar ?? "?"}), ${k.orgdata.anstallda ?? "?"} employees [${k.orgdata.kalla?.url ?? ""}]`
       : "Filings: none found under this name",
-    k.orgdata?.historik.length
-      ? `Filed revenue by year (tkr): ${k.orgdata.historik
+    (k.orgdata?.historik ?? []).length
+      ? `Filed revenue by year (tkr): ${(k.orgdata?.historik ?? [])
           .map((h) => `${h.ar} ${h.omsattningTkr ?? "?"}`)
           .join(", ")}${
-          k.orgdata.tillvaxtProcent !== null
+          k.orgdata?.tillvaxtProcent != null
             ? `. Latest year-on-year: ${k.orgdata.tillvaxtProcent}%`
             : ""
         }`
@@ -377,7 +377,7 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
       .filter((k) => (k.orgdata?.historik.length ?? 0) >= 2)
       .map((k) => ({
         konkurrent: k.namn,
-        serie: k.orgdata!.historik as Bokslutsar[],
+        serie: (k.orgdata!.historik ?? []) as Bokslutsar[],
       })),
     // Stated in code, not written by a model: the reader needs the real rule.
     urval: `The agent searched for companies selling ${rapport.egen.vadNiSaljer.toLowerCase()} to ${rapport.egen.malgrupp.toLowerCase()}, then read the ${konkurrenter.length} it ranked most likely to compete for the same customers${
