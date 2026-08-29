@@ -1,0 +1,10 @@
+.firecrawl/
+
+.env
+.env*.local
+node_modules/
+.next/
+.vercel
+
+*.tsbuildinfo
+.DS_Store

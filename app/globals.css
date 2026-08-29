@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --papper: #faf8f5;
+  --papper-djup: #f2eee8;
+  --black: #1a1a17;
+  --dampad: #6b6459;
+  --linje: #e2dcd2;
+  --amber: #b0722a;
+  --amber-ljus: #e8a33d;
+  --rod: #c0452c;
+  --natt: #0b0b0c;
+  --natt-mjuk: #17171a;
+  --natt-text: #f0ece5;
+  --natt-dampad: #8a857c;
+}
+
+@theme inline {
+  --color-papper: var(--papper);
+  --color-papper-djup: var(--papper-djup);
+  --color-black: var(--black);
+  --color-dampad: var(--dampad);
+  --color-linje: var(--linje);
+  --color-amber: var(--amber);
+  --color-amber-ljus: var(--amber-ljus);
+  --color-rod: var(--rod);
+  --color-natt: var(--natt);
+  --color-natt-mjuk: var(--natt-mjuk);
+  --color-natt-text: var(--natt-text);
+  --color-natt-dampad: var(--natt-dampad);
+  --font-serif: var(--font-display);
+  --font-sans: var(--font-ui);
+}
+
+html {
+  background: var(--papper);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--papper);
+  color: var(--black);
+  font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Browser surfaces we did not draw still carry the design. */
+::selection {
+  background: color-mix(in oklab, var(--amber-ljus) 34%, transparent);
+  color: var(--black);
+}
+:where(.natt) ::selection {
+  background: color-mix(in oklab, var(--amber-ljus) 30%, transparent);
+  color: var(--natt-text);
+}
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+:where(.natt) :focus-visible {
+  outline-color: var(--amber-ljus);
+}
+html {
+  scrollbar-color: var(--linje) transparent;
+  scrollbar-width: thin;
+  caret-color: var(--amber);
+}
+
+/* Numbers that change in place must not reflow their neighbours. */
+.siffror {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes stig {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
