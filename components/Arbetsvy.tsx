@@ -31,16 +31,16 @@ export default function Arbetsvy({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-amber" />
           </span>
-          Arbetar
+          Working
         </span>
         <h1 className="font-serif text-4xl leading-tight text-black sm:text-5xl">
           {foretag ? (
             <>
-              Letar reda på vilka <em className="not-italic text-amber">{foretag}</em>{" "}
-              faktiskt konkurrerar med
+              Working out who <em className="not-italic text-amber">{foretag}</em>{" "}
+              actually competes with
             </>
           ) : (
-            "Läser din webbplats"
+            "Reading your website"
           )}
         </h1>
       </div>

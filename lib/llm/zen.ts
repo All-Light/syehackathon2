@@ -19,7 +19,7 @@ const TIMEOUT = Number(process.env.GRADER_TIMEOUT_MS ?? 120_000);
 
 export async function kor(prompt: string, timeoutMs?: number): Promise<string> {
   const nyckel = process.env.OPENCODE_API_KEY ?? process.env.GRADER_API_KEY;
-  if (!nyckel) throw new Error("OPENCODE_API_KEY saknas i miljön.");
+  if (!nyckel) throw new Error("OPENCODE_API_KEY is missing from the environment.");
 
   const r = await fetch(`${BAS.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
@@ -36,9 +36,9 @@ export async function kor(prompt: string, timeoutMs?: number): Promise<string> {
     signal: AbortSignal.timeout(timeoutMs ?? TIMEOUT),
   });
 
-  if (!r.ok) throw new Error(`Zen svarade ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw new Error(`Zen responded ${r.status}: ${await r.text()}`);
   const d = await r.json();
   const text = d?.choices?.[0]?.message?.content;
-  if (typeof text !== "string") throw new Error("Oväntat svarsformat från Zen.");
+  if (typeof text !== "string") throw new Error("Unexpected response format from Zen.");
   return text;
 }

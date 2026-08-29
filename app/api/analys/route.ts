@@ -14,11 +14,11 @@ export async function POST(req: Request) {
   try {
     indata = await req.json();
   } catch {
-    return new Response("Ogiltig förfrågan.", { status: 400 });
+    return new Response("Invalid request.", { status: 400 });
   }
 
   const url = normalisera(indata.url ?? "");
-  if (!url) return new Response("Ange en webbadress.", { status: 400 });
+  if (!url) return new Response("Enter a web address.", { status: 400 });
 
   const kodare = new TextEncoder();
   const strom = new ReadableStream({
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       } catch (e) {
         skicka({
           typ: "fel",
-          text: e instanceof Error ? e.message : "Något gick fel.",
+          text: e instanceof Error ? e.message : "Something went wrong.",
         });
       } finally {
         styr.close();

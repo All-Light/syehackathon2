@@ -16,27 +16,31 @@ const Schema = z.object({
 /** Step 01. Everything downstream is steered by this, so it reads the real site. */
 export async function profileraSjalv(url: string): Promise<Foretag> {
   const sida = await skrapa(url);
-  if (!sida) throw new Error(`Kunde inte läsa ${url}. Kontrollera adressen.`);
+  if (!sida) throw new Error(`Could not read ${url}. Check the address.`);
 
-  const p = `Du läser ett företags egen webbplats och sammanfattar vad de gör.
+  const p = `You are reading a company's own website and summarising what they do.
 
-# Sidan
+# The page
 URL: ${sida.url}
-Titel: ${sida.titel}
+Title: ${sida.titel}
 
 ${sida.markdown.slice(0, 12_000)}
 
-# Uppgift
-Fyll i fälten utifrån vad som FAKTISKT står på sidan. Gissa inte.
-- "vadNiSaljer": en mening om vad de säljer.
-- "malgrupp": vem som köper. Var konkret ("småföretagare i Sverige", inte "kunder").
-- "prismodell": abonnemang, styckpris, offert — och prisnivå om den syns. Annars "framgår ej".
-- "sprak": sajtens språk, t.ex. "svenska".
-- "geografi": marknaden de verkar rikta sig till.
-- "nyckelord": 2–6 söktermer man skulle använda för att hitta KONKURRENTER till dem.
-  Använd samma språk som sajten. Skriv termer, inte meningar.
+# Task
+Fill in the fields from what the page ACTUALLY says. Do not guess.
+- "namn": the company name.
+- "vadNiSaljer": one sentence on what they sell.
+- "malgrupp": who buys it. Be concrete ("small business owners in Sweden", not "customers").
+- "prismodell": subscription, per-unit, quote-only — and the price level if it is shown.
+  Write "framgår ej" if no price is published.
+- "sprak": the language the site is written in, e.g. "svenska" or "engelska".
+- "geografi": the market they appear to target.
+- "nyckelord": 2-6 search terms you would use to find their COMPETITORS.
+  Use the same language as the site. Terms, not sentences.
 
-Svara med ENBART giltig JSON:
+Write these field values in the site's own language.
+
+Answer with ONLY valid JSON, no prose, no markdown fence:
 {"namn":"","vadNiSaljer":"","malgrupp":"","prismodell":"","sprak":"","geografi":"","nyckelord":[]}`;
 
   const ut = await struktur(p, Schema, { timeoutMs: 60_000 });

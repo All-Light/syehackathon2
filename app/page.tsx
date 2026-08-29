@@ -62,7 +62,7 @@ export default function Sida() {
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      sattFel(e instanceof Error ? e.message : "Något gick fel.");
+      sattFel(e instanceof Error ? e.message : "Something went wrong.");
       sattFas("start");
     }
   }
@@ -119,18 +119,18 @@ export default function Sida() {
         <div className="flex flex-col gap-5">
           <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">Koll</span>
           <h1 className="font-serif text-5xl leading-[1.08] text-black sm:text-6xl">
-            Vet vad dina konkurrenter tar betalt.
+            Know what your competitors charge.
           </h1>
           <p className="max-w-lg text-lg leading-relaxed text-dampad">
-            Klistra in din webbplats. Agenten letar reda på vilka du faktiskt konkurrerar
-            med — även de du inte känner till — läser deras sidor och säger vad du ska
-            göra åt saken.
+            Paste your website. The agent works out who you actually compete with —
+            including the ones you have never heard of — reads their pages and tells
+            you what to do about it.
           </p>
         </div>
 
         <form onSubmit={starta} className="flex flex-col gap-3">
           <label htmlFor="url" className="text-[11px] uppercase tracking-[0.16em] text-dampad">
-            Din webbplats
+            Your website
           </label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
@@ -140,7 +140,7 @@ export default function Sida() {
               autoComplete="url"
               value={url}
               onChange={(e) => sattUrl(e.target.value)}
-              placeholder="dittforetag.se"
+              placeholder="yourcompany.com"
               className="flex-1 border border-linje bg-transparent px-4 py-3 text-black placeholder:text-dampad/60 focus:border-amber focus:outline-none"
             />
             <button
@@ -148,11 +148,11 @@ export default function Sida() {
               className="bg-black px-6 py-3 text-papper transition-colors hover:bg-amber disabled:opacity-40"
               disabled={!url.trim()}
             >
-              Analysera
+              Analyse
             </button>
           </div>
           {fel && <p className="text-sm text-rod">{fel}</p>}
-          <p className="text-sm text-dampad">Tar ungefär två minuter. Ingen inloggning.</p>
+          <p className="text-sm text-dampad">Takes about two minutes. No sign-up.</p>
         </form>
       </div>
     </main>

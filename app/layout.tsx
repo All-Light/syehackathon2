@@ -18,9 +18,9 @@ const ui = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Koll — ha koll på dina konkurrenter",
+  title: "Koll — keep tabs on your competitors",
   description:
-    "Klistra in din webbplats. Nittio sekunder senare vet du vad dina konkurrenter tar betalt, vad de lovar och var de är svaga.",
+    "Paste your website. Ninety seconds later you know what your competitors charge, what they promise and where they are weak.",
 };
 
 export const viewport: Viewport = {
@@ -36,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="sv" className={`${display.variable} ${ui.variable}`}>
+    <html lang="en" className={`${display.variable} ${ui.variable}`}>
       <body>
         {children}
         <Analytics />

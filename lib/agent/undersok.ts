@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { karta, parallellt, skrapa, type Lank, type Sida } from "../firecrawl";
 import { struktur } from "../llm";
-import type { BevakadSida, Konkurrent, SidTyp } from "../types";
+import type { BevakadSida, Konkurrent, Prisniva, SidTyp } from "../types";
 import type { Kandidat } from "./upptack";
 import { hamtaOrgdata } from "./orgdata";
+import { sprakInstruktion } from "./sprak";
 
 const KonkurrentSchema = z.object({
   positionering: z.string(),
@@ -23,6 +24,8 @@ const KonkurrentSchema = z.object({
   svagheter: z.array(z.string()),
 });
 
+export type HamtadSida = { url: string; typ: SidTyp; sida: Sida };
+
 type Val = { url: string; typ: SidTyp };
 
 const MÖNSTER: { typ: SidTyp; re: RegExp; vikt: number }[] = [
@@ -36,7 +39,8 @@ const MÖNSTER: { typ: SidTyp; re: RegExp; vikt: number }[] = [
   { typ: "nyheter", re: /\/(changelog|releases?|news|nyheter|blog|blogg)/i, vikt: 20 },
 ];
 
-const UNDVIK = /\/(privacy|integritet|terms|villkor|cookie|jobs?|careers?|jobb|contact|kontakt|login|signin|support|help|docs?)/i;
+const UNDVIK =
+  /\/(privacy|integritet|terms|villkor|cookie|jobs?|careers?|jobb|contact|kontakt|login|signin|support|help|docs?)/i;
 
 /**
  * Pattern-match first, ask the model only when the patterns find nothing.
@@ -77,6 +81,114 @@ function normalisera(s: string): string {
     .trim();
 }
 
+function dedup<T>(poster: T[], nyckel: (p: T) => string): T[] {
+  const sedda = new Set<string>();
+  return poster.filter((p) => {
+    const k = nyckel(p);
+    if (sedda.has(k)) return false;
+    sedda.add(k);
+    return true;
+  });
+}
+
+export type Detaljer = {
+  positionering: string;
+  malgrupp: string;
+  priser: Prisniva[];
+  funktioner: string[];
+  styrkor: string[];
+  svagheter: string[];
+};
+
+/**
+ * Extraction over pages already in hand. Separate from fetching them so a
+ * monitoring check can re-read exactly the pages it baselined, rather than
+ * re-running page selection and landing on a different pricing page.
+ */
+export async function bearbeta(
+  namn: string,
+  url: string,
+  levande: HamtadSida[],
+  svensk: boolean,
+): Promise<Detaljer | null> {
+  if (!levande.length) return null;
+
+  const detaljer = await struktur(
+    `You are summarising a competitor from their own pages.
+${sprakInstruktion(svensk)}
+
+# Competitor
+${namn} — ${url}
+
+# The pages
+${levande
+  .map(
+    (l) =>
+      `## ${l.typ.toUpperCase()} — ${l.sida.url}\n${l.sida.markdown.slice(0, l.typ === "pris" ? 6_000 : 2_500)}`,
+  )
+  .join("\n\n")}
+
+# Task
+- "priser": every price tier that ACTUALLY appears on the pages. "citat" must be
+  verbatim from the text above and must contain the price. "kallURL" is the page
+  the quote is on. If no price is published, leave the list empty.
+  NEVER invent a price.
+- "funktioner": what the product does, short bullets, in their own words.
+- "styrkor" and "svagheter": what the pages let you conclude. A weakness can be
+  something missing — no published price, no Swedish site, a narrow audience.
+- "positionering": one sentence on how they present themselves.
+- "malgrupp": who they are selling to.
+
+Answer with ONLY valid JSON, no prose, no markdown fence:
+{"positionering":"","malgrupp":"","priser":[{"namn":"","pris":"","period":null,"citat":"","kallURL":""}],"funktioner":[],"styrkor":[],"svagheter":[]}`,
+    KonkurrentSchema,
+    { timeoutMs: 75_000 },
+  ).catch((e) => {
+    console.error(`[undersok] ${namn}:`, e instanceof Error ? e.message : e);
+    return null;
+  });
+
+  if (!detaljer) return null;
+
+  const text = normalisera(levande.map((l) => l.sida.markdown).join("\n"));
+
+  return {
+    positionering: detaljer.positionering,
+    malgrupp: detaljer.malgrupp,
+    // A price whose quote is not on a page we actually read is a hallucination.
+    priser: dedup(
+      detaljer.priser.filter((p) => {
+        const c = normalisera(p.citat ?? "");
+        const ok = c.length >= 6 && text.includes(c.slice(0, 30));
+        if (!ok) {
+          console.warn(`[pris] ${namn}: dropped "${p.namn} ${p.pris}" — quote not found on the page`);
+        }
+        return ok;
+      }),
+      (p) => `${normalisera(p.namn)}|${normalisera(p.pris)}`,
+    )
+      .slice(0, 6)
+      .map((p) => ({
+        namn: p.namn,
+        pris: p.pris,
+        period: p.period,
+        kalla: { url: p.kallURL, citat: p.citat },
+      })),
+    funktioner: detaljer.funktioner.slice(0, 8),
+    styrkor: detaljer.styrkor.slice(0, 4),
+    svagheter: detaljer.svagheter.slice(0, 4),
+  };
+}
+
+export function bevakad(l: HamtadSida): BevakadSida {
+  return {
+    url: l.sida.url,
+    typ: l.typ,
+    hash: createHash("sha256").update(l.sida.markdown).digest("hex").slice(0, 16),
+    hamtad: new Date().toISOString(),
+  };
+}
+
 /** Step 03. The agent picks which pages are worth the scrape, then reads them. */
 export async function undersokKonkurrent(
   kandidat: Kandidat,
@@ -84,7 +196,7 @@ export async function undersokKonkurrent(
   svensk: boolean,
   loggning?: (text: string) => void,
 ): Promise<Konkurrent> {
-  loggning?.(`Kartlägger ${kandidat.namn}`);
+  loggning?.(`Mapping ${kandidat.namn}`);
 
   const lankar = await karta(kandidat.url, {
     search: svensk ? "priser prenumeration om oss" : "pricing plans about",
@@ -102,96 +214,30 @@ export async function undersokKonkurrent(
         return s.url;
       }
     })();
-    loggning?.(`Läser ${vag} hos ${kandidat.namn}`);
+    loggning?.(`Reading ${vag} on ${kandidat.namn}`);
     const sida = await skrapa(s.url);
-    return sida ? { ...s, sida } : null;
+    return sida ? { url: s.url, typ: s.typ, sida } : null;
   });
 
-  const levande = hamtade.filter((x): x is { url: string; typ: SidTyp; sida: Sida } => x !== null);
-
-  const sidor: BevakadSida[] = levande.map((l) => ({
-    url: l.sida.url,
-    typ: l.typ,
-    hash: createHash("sha256").update(l.sida.markdown).digest("hex").slice(0, 16),
-    hamtad: new Date().toISOString(),
-  }));
+  const levande = hamtade.filter((x): x is HamtadSida => x !== null);
 
   const [detaljer, orgdata] = await Promise.all([
-    levande.length
-      ? struktur(
-          `Du sammanfattar en konkurrent utifrån deras egna sidor.
-
-# Konkurrent
-${kandidat.namn} — ${kandidat.url}
-
-# Sidorna
-${levande
-  .map((l) => `## ${l.typ.toUpperCase()} — ${l.sida.url}\n${l.sida.markdown.slice(0, l.typ === "pris" ? 6_000 : 2_500)}`)
-  .join("\n\n")}
-
-# Uppgift
-- "priser": varje prisnivå som FAKTISKT står på sidorna. "citat" måste vara ordagrant
-  från texten ovan och innehålla priset. "kallURL" är sidan citatet står på.
-  Finns inget pris publicerat: lämna listan tom. Hitta ALDRIG på ett pris.
-- "funktioner": vad produkten gör, korta punkter, deras egna ord.
-- "styrkor" och "svagheter": vad man kan utläsa av sidorna. Svagheter kan vara
-  saker som saknas — inget publicerat pris, ingen svensk sajt, smal målgrupp.
-- "positionering": en mening om hur de framställer sig.
-
-Svara med ENBART giltig JSON:
-{"positionering":"","malgrupp":"","priser":[{"namn":"","pris":"","period":null,"citat":"","kallURL":""}],"funktioner":[],"styrkor":[],"svagheter":[]}`,
-          KonkurrentSchema,
-          { timeoutMs: 75_000 },
-        ).catch((e) => {
-          console.error(`[undersok] ${kandidat.namn}:`, e instanceof Error ? e.message : e);
-          return null;
-        })
-      : Promise.resolve(null),
+    bearbeta(kandidat.namn, kandidat.url, levande, svensk),
     svensk ? hamtaOrgdata(kandidat.namn) : Promise.resolve(null),
   ]);
-
-  const text = normalisera(levande.map((l) => l.sida.markdown).join("\n"));
 
   return {
     namn: kandidat.namn,
     url: kandidat.url,
     hittadAv,
     varfor: kandidat.varfor,
-    positionering: detaljer?.positionering ?? "Kunde inte läsas.",
+    positionering: detaljer?.positionering ?? "Could not be read.",
     malgrupp: detaljer?.malgrupp ?? "",
-    // A price whose quote is not on a page we actually read is a hallucination.
-    priser: dedup(
-      (detaljer?.priser ?? []).filter((p) => {
-        const c = normalisera(p.citat ?? "");
-        const ok = c.length >= 6 && text.includes(c.slice(0, 30));
-        if (!ok) {
-          console.warn(`[pris] ${kandidat.namn}: släppte "${p.namn} ${p.pris}" — citatet fanns inte på sidan`);
-        }
-        return ok;
-      }),
-      (p) => `${normalisera(p.namn)}|${normalisera(p.pris)}`,
-    )
-      .slice(0, 6)
-      .map((p) => ({
-      namn: p.namn,
-      pris: p.pris,
-      period: p.period,
-      kalla: { url: p.kallURL, citat: p.citat },
-    })),
-    funktioner: (detaljer?.funktioner ?? []).slice(0, 8),
-    styrkor: (detaljer?.styrkor ?? []).slice(0, 4),
-    svagheter: (detaljer?.svagheter ?? []).slice(0, 4),
+    priser: detaljer?.priser ?? [],
+    funktioner: detaljer?.funktioner ?? [],
+    styrkor: detaljer?.styrkor ?? [],
+    svagheter: detaljer?.svagheter ?? [],
     orgdata,
-    sidor,
+    sidor: levande.map(bevakad),
   };
-}
-
-function dedup<T>(poster: T[], nyckel: (p: T) => string): T[] {
-  const sedda = new Set<string>();
-  return poster.filter((p) => {
-    const k = nyckel(p);
-    if (sedda.has(k)) return false;
-    sedda.add(k);
-    return true;
-  });
 }

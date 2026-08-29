@@ -15,7 +15,12 @@ export default async function DeladRapport({
 
   return (
     <main className="min-h-dvh bg-papper">
-      <Rapportvy rapport={sparad.rapport} id={sparad.id} bevakasFran={sparad.bevakas} />
+      <Rapportvy
+        rapport={sparad.rapport}
+        id={sparad.id}
+        bevakasFran={sparad.bevakas}
+        betald={sparad.betald}
+      />
     </main>
   );
 }

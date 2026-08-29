@@ -5,6 +5,6 @@ export function plockaJson(raw: string): unknown {
   const kandidat = fence ? fence[1] : utanAnsi;
   const start = kandidat.indexOf("{");
   const slut = kandidat.lastIndexOf("}");
-  if (start === -1 || slut === -1) throw new Error("Hittade ingen JSON i svaret.");
+  if (start === -1 || slut === -1) throw new Error("No JSON found in the response.");
   return JSON.parse(kandidat.slice(start, slut + 1));
 }

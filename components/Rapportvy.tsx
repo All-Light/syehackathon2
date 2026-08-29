@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Forandring, Insikt, Konkurrent, Rapport } from "@/lib/types";
+import Betala from "@/components/Betala";
+import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
 
 function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | null }) {
   const [oppen, satt] = useState(false);
@@ -14,7 +15,7 @@ function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | nul
         className="self-start text-[11px] uppercase tracking-[0.12em] text-amber underline-offset-4 hover:underline"
         aria-expanded={oppen}
       >
-        {oppen ? "Dölj källa" : "Visa källa"}
+        {oppen ? "Hide source" : "Show source"}
       </button>
       {oppen && (
         <span className="block border-l-2 border-linje pl-3 text-sm text-dampad">
@@ -64,7 +65,7 @@ function Kort({ k }: { k: Konkurrent }) {
           <h3 className="font-serif text-2xl text-black">{k.namn}</h3>
           {k.hittadAv === "agenten" && (
             <span className="rounded-full bg-amber/12 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-amber">
-              Hittad åt dig
+              Found for you
             </span>
           )}
         </div>
@@ -94,7 +95,7 @@ function Kort({ k }: { k: Konkurrent }) {
         </ul>
       ) : (
         <p className="border-t border-linje pt-4 text-sm text-dampad">
-          Inget pris publicerat på sajten.
+          No price published on the site.
         </p>
       )}
 
@@ -102,25 +103,25 @@ function Kort({ k }: { k: Konkurrent }) {
         <dl className="flex flex-wrap gap-x-6 gap-y-2 border-t border-linje pt-4">
           {k.orgdata.omsattningTkr !== null && (
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Omsättning</dt>
+              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Revenue</dt>
               <dd className="siffror text-sm text-black">
-                {(k.orgdata.omsattningTkr / 1000).toLocaleString("sv-SE", {
+                {(k.orgdata.omsattningTkr / 1000).toLocaleString("en-GB", {
                   maximumFractionDigits: 1,
                 })}{" "}
-                Mkr
+                MSEK
                 {k.orgdata.ar && <span className="text-dampad"> ({k.orgdata.ar})</span>}
               </dd>
             </div>
           )}
           {k.orgdata.anstallda !== null && (
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Anställda</dt>
+              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Employees</dt>
               <dd className="siffror text-sm text-black">{k.orgdata.anstallda}</dd>
             </div>
           )}
           {k.orgdata.tillvaxtProcent !== null && (
             <div>
-              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Tillväxt</dt>
+              <dt className="text-[10px] uppercase tracking-[0.12em] text-dampad">Growth</dt>
               <dd className="siffror text-sm text-black">
                 {k.orgdata.tillvaxtProcent > 0 ? "+" : ""}
                 {k.orgdata.tillvaxtProcent} %
@@ -147,16 +148,22 @@ export default function Rapportvy({
   rapport,
   id,
   bevakasFran = false,
+  betald = false,
 }: {
   rapport: Rapport;
   id: string | null;
   bevakasFran?: boolean;
+  betald?: boolean;
 }) {
   const [bevakas, sattBevakas] = useState(bevakasFran);
   const [delad, sattDelad] = useState(false);
   const [kontrollerar, sattKontrollerar] = useState(false);
   const [forandringar, sattForandringar] = useState<Forandring[] | null>(null);
-  const hittade = rapport.konkurrenter.filter((k) => k.hittadAv === "agenten").length;
+  const [lasta, sattLasta] = useState<Konkurrent[]>(rapport.konkurrenter);
+  const [ovriga, sattOvriga] = useState<Namngiven[]>(rapport.ovriga ?? []);
+  const [soker, sattSoker] = useState(false);
+  const [laser, sattLaser] = useState<string | null>(null);
+  const hittade = lasta.filter((k) => k.hittadAv === "agenten").length;
 
   async function vaxlaBevakning() {
     if (!id) return;
@@ -167,6 +174,45 @@ export default function Rapportvy({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, bevakas: nytt }),
     }).catch(() => sattBevakas(!nytt));
+  }
+
+  async function sokFler() {
+    if (!id || soker) return;
+    sattSoker(true);
+    try {
+      const svar = await fetch("/api/fler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = (await svar.json()) as { nya?: Namngiven[] };
+      if (data.nya?.length) sattOvriga((o) => [...o, ...data.nya!]);
+    } catch {
+      // Nothing found is the same outcome to the reader as a failed sweep.
+    } finally {
+      sattSoker(false);
+    }
+  }
+
+  async function las(url: string) {
+    if (!id || laser) return;
+    sattLaser(url);
+    try {
+      const svar = await fetch("/api/undersok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, url }),
+      });
+      const data = (await svar.json()) as { konkurrent?: Konkurrent };
+      if (data.konkurrent) {
+        sattLasta((k) => [...k, data.konkurrent!]);
+        sattOvriga((o) => o.filter((x) => x.url !== url));
+      }
+    } catch {
+      // Leave it in the list; the reader can try again.
+    } finally {
+      sattLaser(null);
+    }
   }
 
   async function koraKontroll() {
@@ -197,10 +243,10 @@ export default function Rapportvy({
           {rapport.sammanfattning}
         </h1>
         <p className="text-[15px] text-dampad">
-          {rapport.konkurrenter.length} konkurrenter lästa
+          {lasta.length} competitors read
           {hittade > 0 && (
             <>
-              , varav <span className="text-amber">{hittade} hittade åt dig</span>
+              , <span className="text-amber">{hittade} of them found for you</span>
             </>
           )}
           .
@@ -208,7 +254,7 @@ export default function Rapportvy({
       </header>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">Att göra i veckan</h2>
+        <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">To do this week</h2>
         <ol className="flex flex-col gap-4">
           {rapport.atgarder.map((a, n) => (
             <li key={a} className="flex gap-4">
@@ -220,28 +266,87 @@ export default function Rapportvy({
       </section>
 
       <div className="grid gap-10 sm:grid-cols-2">
-        <Insikter rubrik="Där de är starkare" poster={rapport.hot} />
-        <Insikter rubrik="Där du kan attackera" poster={rapport.luckor} />
+        <Insikter rubrik="Where they are stronger" poster={rapport.hot} />
+        <Insikter rubrik="Where you can attack" poster={rapport.luckor} />
       </div>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">Konkurrenterna</h2>
+        <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">The competitors</h2>
         <div className="flex flex-col gap-4">
-          {rapport.konkurrenter.map((k) => (
+          {lasta.map((k) => (
             <Kort key={k.url} k={k} />
           ))}
         </div>
       </section>
 
+      {(ovriga.length > 0 || id) && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+            Also competing{ovriga.length > 0 && ` (${ovriga.length})`}
+          </h2>
+          {ovriga.length > 0 ? (
+            <>
+              <p className="text-sm text-dampad">
+                Named but not read yet. Reading one takes about twenty seconds.
+              </p>
+              <ul className="flex flex-col divide-y divide-linje border-y border-linje">
+                {ovriga.map((o) => (
+                  <li
+                    key={o.url}
+                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <a
+                        href={o.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-black underline-offset-4 hover:text-amber hover:underline"
+                      >
+                        {o.namn}
+                      </a>
+                      <span className="text-sm text-dampad">{o.varfor}</span>
+                    </span>
+                    {id && (
+                      <button
+                        type="button"
+                        onClick={() => las(o.url)}
+                        disabled={laser !== null}
+                        className="shrink-0 border border-linje px-3 py-1.5 text-xs text-dampad hover:border-black hover:text-black disabled:opacity-50"
+                      >
+                        {laser === o.url ? "Reading…" : "Read this one"}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm text-dampad">
+              Everything the first sweep found has been read.
+            </p>
+          )}
+          {id && (
+            <button
+              type="button"
+              onClick={sokFler}
+              disabled={soker}
+              className="self-start border border-linje px-5 py-2.5 text-sm text-dampad hover:border-black hover:text-black disabled:opacity-50"
+            >
+              {soker ? "Sweeping again…" : "Find more competitors"}
+            </button>
+          )}
+        </section>
+      )}
+
       {forandringar !== null && (
         <section className="flex flex-col gap-4 border-l-2 border-amber pl-5">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
-            Sedan rapporten skrevs
+            Since this report was written
           </h2>
           {forandringar.length === 0 ? (
             <p className="text-[15px] text-dampad">
-              Inget har ändrats på de {rapport.konkurrenter.reduce((n, k) => n + k.sidor.length, 0)}{" "}
-              sidor vi bevakar.
+              Nothing has changed on the{" "}
+              {lasta.reduce((n, k) => n + k.sidor.length, 0)} pages we watch.
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
@@ -267,7 +372,7 @@ export default function Rapportvy({
                 : "border border-black text-black hover:bg-black hover:text-papper"
             }`}
           >
-            {bevakas ? "Bevakas — vi hör av oss" : "Bevaka dessa"}
+            {bevakas ? "Watching — we'll be in touch" : "Watch these"}
           </button>
           <button
             type="button"
@@ -275,7 +380,7 @@ export default function Rapportvy({
             disabled={kontrollerar}
             className="border border-linje px-5 py-2.5 text-sm text-dampad hover:border-black hover:text-black disabled:opacity-50"
           >
-            {kontrollerar ? "Läser om sidorna…" : "Kör kontroll nu"}
+            {kontrollerar ? "Re-reading the pages…" : "Check now"}
           </button>
           <button
             type="button"
@@ -286,10 +391,12 @@ export default function Rapportvy({
             }}
             className="border border-linje px-5 py-2.5 text-sm text-dampad hover:border-black hover:text-black"
           >
-            {delad ? "Länk kopierad" : "Dela rapport"}
+            {delad ? "Link copied" : "Share report"}
           </button>
         </footer>
       )}
+
+      {id && <Betala id={id} betald={betald} />}
     </div>
   );
 }

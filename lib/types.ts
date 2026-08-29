@@ -63,10 +63,24 @@ export type Insikt = {
   kalla: Kalla | null;
 };
 
+/**
+ * A competitor we have named but not yet read. Discovery is cheap and finding
+ * fifteen is nearly the same cost as finding five; reading one costs a map, two
+ * scrapes and an LLM call. So we name everything and deep-read the top few.
+ */
+export type Namngiven = {
+  namn: string;
+  url: string;
+  varfor: string;
+  hittadAv: "du" | "agenten";
+};
+
 export type Rapport = {
   sammanfattning: string;
   egen: Foretag;
   konkurrenter: Konkurrent[];
+  /** Named, ranked, not read. The user can promote any of these. */
+  ovriga: Namngiven[];
   hot: Insikt[];
   luckor: Insikt[];
   atgarder: string[];

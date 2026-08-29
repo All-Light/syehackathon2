@@ -1,85 +1,79 @@
 import { z } from "zod";
 import { struktur } from "../llm";
-import type { Foretag, Konkurrent, Rapport } from "../types";
+import type { Foretag, Konkurrent, Namngiven, Rapport } from "../types";
+import { sprakFor } from "./sprak";
+
+const Insikt = z.object({
+  rubrik: z.string(),
+  text: z.string(),
+  konkurrent: z.string().nullable(),
+  citat: z.string().nullable(),
+  kallURL: z.string().nullable(),
+});
 
 const Schema = z.object({
   sammanfattning: z.string(),
-  hot: z
-    .array(
-      z.object({
-        rubrik: z.string(),
-        text: z.string(),
-        konkurrent: z.string().nullable(),
-        citat: z.string().nullable(),
-        kallURL: z.string().nullable(),
-      }),
-    ),
-  luckor: z
-    .array(
-      z.object({
-        rubrik: z.string(),
-        text: z.string(),
-        konkurrent: z.string().nullable(),
-        citat: z.string().nullable(),
-        kallURL: z.string().nullable(),
-      }),
-    ),
+  hot: z.array(Insikt),
+  luckor: z.array(Insikt),
   atgarder: z.array(z.string()).min(1),
 });
 
 function beskriv(k: Konkurrent): string {
   const priser = k.priser.length
-    ? k.priser.map((p) => `${p.namn}: ${p.pris}${p.period ? ` / ${p.period}` : ""} [${p.kalla.url}]`).join("; ")
-    : "inget publicerat pris";
+    ? k.priser
+        .map((p) => `${p.namn}: ${p.pris}${p.period ? ` / ${p.period}` : ""} [${p.kalla.url}]`)
+        .join("; ")
+    : "no published price";
   const org = k.orgdata
-    ? `Omsättning ${k.orgdata.omsattningTkr ?? "?"} tkr (${k.orgdata.ar ?? "?"}), ` +
-      `${k.orgdata.anstallda ?? "?"} anställda` +
-      (k.orgdata.tillvaxtProcent !== null ? `, tillväxt ${k.orgdata.tillvaxtProcent} %` : "")
-    : "inga offentliga bokslutssiffror hittade";
+    ? `Revenue ${k.orgdata.omsattningTkr ?? "?"} tkr (${k.orgdata.ar ?? "?"}), ` +
+      `${k.orgdata.anstallda ?? "?"} employees`
+    : "no public accounts found";
 
   return `## ${k.namn} (${k.url})
-Positionering: ${k.positionering}
-Målgrupp: ${k.malgrupp}
-Priser: ${priser}
-Funktioner: ${k.funktioner.join(", ") || "—"}
-Styrkor: ${k.styrkor.join(", ") || "—"}
-Svagheter: ${k.svagheter.join(", ") || "—"}
-Bolagsdata: ${org}`;
+Positioning: ${k.positionering}
+Audience: ${k.malgrupp}
+Prices: ${priser}
+Features: ${k.funktioner.join(", ") || "—"}
+Strengths: ${k.styrkor.join(", ") || "—"}
+Weaknesses: ${k.svagheter.join(", ") || "—"}
+Company data: ${org}`;
 }
 
 /** Step 04. Judgment, not summary. Three actions, not fifteen observations. */
 export async function syntetisera(
   egen: Foretag,
   konkurrenter: Konkurrent[],
+  ovriga: Namngiven[] = [],
 ): Promise<Rapport> {
-  const p = `Du är en rådgivare som just gått igenom ett företags konkurrenter åt dem.
-Du talar till ägaren. Var konkret, kort och ärlig. Skriv på svenska.
+  const p = `You are an adviser who has just gone through a company's competitors for them.
+You are speaking to the owner. Be concrete, brief and honest.
+${sprakFor(egen)}
 
-# Företaget du råder
+# The company you are advising
 ${egen.namn} (${egen.url})
-Säljer: ${egen.vadNiSaljer}
-Till: ${egen.malgrupp}
-Prismodell: ${egen.prismodell}
-Marknad: ${egen.geografi}
+Sells: ${egen.vadNiSaljer}
+To: ${egen.malgrupp}
+Pricing model: ${egen.prismodell}
+Market: ${egen.geografi}
 
-# Konkurrenterna, lästa från deras egna sidor
+# The competitors, read from their own pages
 ${konkurrenter.map(beskriv).join("\n\n")}
 
-# Uppgift
-- "sammanfattning": EN mening, högst 100 tecken. Den visas som rubrik.
-- "hot": där konkurrenterna är starkare. Högst 4.
-- "luckor": där ${egen.namn} kan attackera — något ingen av dem gör, eller gör dåligt. Högst 4.
-- "atgarder": exakt 3 saker att göra den här veckan. Konkreta och genomförbara för ett
-  litet företag. Inte "se över er positionering" utan "sätt ut priset på startsidan —
-  två av tre konkurrenter döljer sitt".
-- "citat" och "kallURL": ordagrant citat och URL som stödjer påståendet, när ett finns
-  i underlaget ovan. Annars null. Hitta ALDRIG på ett citat.
+# Task
+- "sammanfattning": ONE sentence, at most 100 characters. It is shown as the headline.
+- "hot": where the competitors are stronger. At most 4.
+- "luckor": where ${egen.namn} can attack — something none of them do, or do badly. At most 4.
+- "atgarder": exactly 3 things to do this week. Concrete and doable for a small
+  company. Not "review your positioning" but "put your price on the homepage —
+  two of the three competitors hide theirs".
+- "citat" and "kallURL": a verbatim quote and URL from the material above that
+  supports the claim, when one exists. Otherwise null. NEVER invent a quote.
 
-Svara med ENBART giltig JSON:
+Answer with ONLY valid JSON, no prose, no markdown fence:
 {"sammanfattning":"","hot":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"luckor":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"atgarder":[]}`;
 
   const ut = await struktur(p, Schema, { timeoutMs: 90_000 });
-  const insikt = (i: z.infer<typeof Schema>["hot"][number]) => ({
+  const insikt = (i: z.infer<typeof Insikt>) => ({
     rubrik: i.rubrik,
     text: i.text,
     konkurrent: i.konkurrent,
@@ -90,6 +84,7 @@ Svara med ENBART giltig JSON:
     sammanfattning: ut.sammanfattning,
     egen,
     konkurrenter,
+    ovriga,
     hot: ut.hot.slice(0, 4).map(insikt),
     luckor: ut.luckor.slice(0, 4).map(insikt),
     atgarder: ut.atgarder.slice(0, 3),

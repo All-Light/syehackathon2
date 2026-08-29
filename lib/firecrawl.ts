@@ -39,7 +39,7 @@ export type Lank = { url: string; title?: string; description?: string };
  */
 async function anrop<T>(vag: string, kropp: unknown): Promise<T> {
   const nyckel = process.env.FIRECRAWL_API_KEY;
-  if (!nyckel) throw new Error("FIRECRAWL_API_KEY saknas i miljön.");
+  if (!nyckel) throw new Error("FIRECRAWL_API_KEY is missing from the environment.");
 
   let sistaFel = "";
   for (let forsok = 0; forsok < 3; forsok++) {
@@ -56,12 +56,12 @@ async function anrop<T>(vag: string, kropp: unknown): Promise<T> {
 
     if (r.ok) return (await r.json()) as T;
 
-    sistaFel = `Firecrawl ${vag} svarade ${r.status}: ${(await r.text()).slice(0, 200)}`;
+    sistaFel = `Firecrawl ${vag} responded ${r.status}: ${(await r.text()).slice(0, 200)}`;
     if (r.status !== 429 && r.status < 500) break;
 
     const efter = Number(r.headers.get("retry-after"));
     const vanta = Number.isFinite(efter) && efter > 0 ? efter * 1000 : 1500 * 2 ** forsok;
-    console.warn(`[firecrawl] ${r.status} på ${vag}, väntar ${vanta} ms`);
+    console.warn(`[firecrawl] ${r.status} on ${vag}, waiting ${vanta} ms`);
     await new Promise((k) => setTimeout(k, Math.min(vanta, 15_000)));
   }
 
@@ -100,7 +100,15 @@ export async function karta(
 
 export type Sida = { url: string; markdown: string; titel: string };
 
-export async function skrapa(url: string): Promise<Sida | null> {
+/**
+ * `farsk` bypasses Firecrawl's cache. A monitoring check must, or it compares
+ * the cached page against the hash of that same cached page and reports that
+ * nothing ever changes.
+ */
+export async function skrapa(
+  url: string,
+  val: { farsk?: boolean } = {},
+): Promise<Sida | null> {
   try {
     const svar = await anrop<{
       data?: { markdown?: string; metadata?: { title?: string; sourceURL?: string } };
@@ -108,7 +116,7 @@ export async function skrapa(url: string): Promise<Sida | null> {
       url,
       formats: ["markdown"],
       onlyMainContent: true,
-      maxAge: 86_400_000,
+      maxAge: val.farsk ? 0 : 86_400_000,
     });
     const markdown = svar.data?.markdown;
     if (!markdown) return null;

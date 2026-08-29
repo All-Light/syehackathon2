@@ -33,7 +33,7 @@ export async function struktur<T>(
       sistaFel = e;
     }
   }
-  throw sistaFel instanceof Error ? sistaFel : new Error("LLM-anropet misslyckades.");
+  throw sistaFel instanceof Error ? sistaFel : new Error("The LLM call failed.");
 }
 
 export { plockaJson };

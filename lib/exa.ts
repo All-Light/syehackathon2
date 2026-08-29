@@ -29,7 +29,7 @@ export async function exaSok(
   } = {},
 ): Promise<ExaTraff[]> {
   const nyckel = process.env.EXA_API_KEY;
-  if (!nyckel) throw new Error("EXA_API_KEY saknas i miljön.");
+  if (!nyckel) throw new Error("EXA_API_KEY is missing from the environment.");
 
   const r = await fetch(`${BAS}/search`, {
     method: "POST",
@@ -44,7 +44,35 @@ export async function exaSok(
     signal: AbortSignal.timeout(TIMEOUT),
   });
 
-  if (!r.ok) throw new Error(`Exa svarade ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw new Error(`Exa responded ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const d = (await r.json()) as { results?: ExaTraff[] };
+  return d.results ?? [];
+}
+
+/**
+ * Pages semantically similar to a given one. A different mechanism from
+ * keyword search, which is the point: a second sweep that re-runs the same
+ * kind of query mostly re-finds the same companies.
+ */
+export async function exaLiknande(
+  url: string,
+  val: { antal?: number } = {},
+): Promise<ExaTraff[]> {
+  const nyckel = process.env.EXA_API_KEY;
+  if (!nyckel) throw new Error("EXA_API_KEY is missing from the environment.");
+
+  const r = await fetch(`${BAS}/findSimilar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": nyckel },
+    body: JSON.stringify({
+      url,
+      numResults: val.antal ?? 6,
+      excludeSourceDomain: true,
+    }),
+    signal: AbortSignal.timeout(TIMEOUT),
+  });
+
+  if (!r.ok) throw new Error(`Exa findSimilar responded ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const d = (await r.json()) as { results?: ExaTraff[] };
   return d.results ?? [];
 }
