@@ -5,6 +5,12 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function GET(req: Request) {
+  // Unauthenticated and it spends Firecrawl and Exa credits on every hit, so it
+  // stays on the machine it was written for.
+  if (process.env.VERCEL_ENV === "production") {
+    return new Response("Not available.", { status: 404 });
+  }
+
   const namn = new URL(req.url).searchParams.get("namn") ?? "Visma";
   const steg: Record<string, unknown> = { namn };
 
