@@ -134,8 +134,8 @@ function Sektortabell({
                 key={k.ar}
                 onMouseEnter={() => sattHovAr(k.ar)}
                 onMouseLeave={() => sattHovAr(null)}
-                className={`siffror py-2 pl-3 text-right font-normal ${
-                  hovAr === k.ar ? "bg-papper-djup" : ""
+                className={`data py-2 pl-3 text-right font-normal ${
+                  hovAr === k.ar ? "bg-upphojd" : ""
                 }`}
               >
                 {k.ar}
@@ -154,10 +154,10 @@ function Sektortabell({
                     key={k.ar}
                     onMouseEnter={() => sattHovAr(k.ar)}
                     onMouseLeave={() => sattHovAr(null)}
-                    className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-papper-djup" : ""}`}
+                    className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-upphojd" : ""}`}
                   >
                     {p ? (
-                      <span className="siffror text-black">{tal(p.v / 1000)}</span>
+                      <span className="data text-black">{tal(p.v / 1000)}</span>
                     ) : (
                       <span className="text-dampad">—</span>
                     )}
@@ -175,12 +175,12 @@ function Sektortabell({
                 key={k.ar}
                 onMouseEnter={() => sattHovAr(k.ar)}
                 onMouseLeave={() => sattHovAr(null)}
-                className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-papper-djup" : ""}`}
+                className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-upphojd" : ""}`}
               >
                 {k.total === null ? (
                   <span className="text-dampad">—</span>
                 ) : (
-                  <span className="siffror font-medium text-black">{tal(k.total / 1000)}</span>
+                  <span className="data font-medium text-black">{tal(k.total / 1000)}</span>
                 )}
               </td>
             ))}
@@ -192,9 +192,9 @@ function Sektortabell({
                 key={k.ar}
                 onMouseEnter={() => sattHovAr(k.ar)}
                 onMouseLeave={() => sattHovAr(null)}
-                className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-papper-djup" : ""}`}
+                className={`py-2 pl-3 text-right ${hovAr === k.ar ? "bg-upphojd" : ""}`}
               >
-                <span className="siffror text-dampad">{k.namn.length}</span>
+                <span className="data text-dampad">{k.namn.length}</span>
               </td>
             ))}
           </tr>
@@ -353,10 +353,10 @@ export function Sektorintakt({ konkurrenter, egen = null }: Sektorprops) {
 
   /* Geometry. Fixed integer viewBox; only the strip's height follows the number
      of filing companies. */
-  const B = 760;
+  const B = 792;
   const ranna = 120;
   const x0 = 132;
-  const x1 = 744;
+  const x1 = 776;
   const y1 = 46;
   const y0 = 224;
   const yAr = 246;
@@ -387,186 +387,191 @@ export function Sektorintakt({ konkurrenter, egen = null }: Sektorprops) {
       {ritbar ? (
         // The table below carries every value, so the drawing is hidden from a screen
         // reader rather than read out as a second, worse copy of the same data.
-        <svg
-          viewBox={`0 0 ${B} ${H}`}
-          width="100%"
-          aria-hidden="true"
-          className="h-auto w-full overflow-visible"
-        >
-          <title>{`Filed revenue of every competitor that files, ${minAr}–${maxAr}`}</title>
-
-          {/* Recessive first: the hover band, then the grid, then the axis, then data. */}
-          {hovAr !== null && (
-            <rect
-              x={mitt(hovAr - minAr) - steg2 / 2}
-              y={y1 - 12}
-              width={steg2}
-              height={stripBotten + 8 - (y1 - 12)}
-              fill="var(--papper-djup)"
-            />
-          )}
-
-          {kolumner.map((k, n) => (
-            <g key={`rutnat-${k.ar}`}>
-              <line
-                x1={mitt(n)}
-                y1={y1 - 6}
-                x2={mitt(n)}
-                y2={y0}
-                stroke="var(--linje)"
-                strokeWidth="1"
-              />
-              {/* Carried on below the year label so the strip's marks sit on the
-                  same rules as the columns they belong to. */}
-              <line
-                x1={mitt(n)}
-                y1={yRubrik - 6}
-                x2={mitt(n)}
-                y2={stripBotten + 8}
-                stroke="var(--linje)"
-                strokeWidth="1"
-              />
-            </g>
-          ))}
-
-          <line x1={x0} y1={y0} x2={x1} y2={y0} stroke="var(--linje)" strokeWidth="1" />
-
-          {/* No horizontal gridlines: the ceiling and the zero state the scale, and
-              every column states its own value. */}
-          <text
-            x={ranna}
-            y={y1 + 4}
-            textAnchor="end"
-            fontSize="11"
-            fill="var(--dampad)"
-            style={{ fontVariantNumeric: "tabular-nums" }}
+        // Below about 700px a viewBox this wide scales its 12px ticks down to
+        // single figures, so the drawing scrolls at a legible size rather than
+        // shrinking into one. Print still gets the whole width on the page.
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 print:overflow-visible">
+          <svg
+            viewBox={`0 0 ${B} ${H}`}
+            width="100%"
+            aria-hidden="true"
+            className="h-auto w-full min-w-[640px] overflow-visible print:min-w-0"
           >
-            {belopp(tak)}
-          </text>
-          <text
-            x={ranna}
-            y={y0 + 4}
-            textAnchor="end"
-            fontSize="11"
-            fill="var(--dampad)"
-            style={{ fontVariantNumeric: "tabular-nums" }}
-          >
-            0
-          </text>
+            <title>{`Filed revenue of every competitor that files, ${minAr}–${maxAr}`}</title>
 
-          {kolumner.map((k, n) => {
-            const aktiv = hovAr === k.ar;
-            const visaVarde = !glesa || n % 2 === kolumner.length % 2;
-            return (
-              <g key={`kolumn-${k.ar}`}>
-                {k.total === null ? (
-                  // Nobody filed this year. No column, no zero — a dash where the
-                  // column is not, and every row of the strip below says the same.
+            {/* Recessive first: the hover band, then the grid, then the axis, then data. */}
+            {hovAr !== null && (
+              <rect
+                x={mitt(hovAr - minAr) - steg2 / 2}
+                y={y1 - 12}
+                width={steg2}
+                height={stripBotten + 8 - (y1 - 12)}
+                fill="var(--upphojd)"
+              />
+            )}
+
+            {kolumner.map((k, n) => (
+              <g key={`rutnat-${k.ar}`}>
+                <line
+                  x1={mitt(n)}
+                  y1={y1 - 6}
+                  x2={mitt(n)}
+                  y2={y0}
+                  stroke="var(--linje)"
+                  strokeWidth="1"
+                />
+                {/* Carried on below the year label so the strip's marks sit on the
+                    same rules as the columns they belong to. */}
+                <line
+                  x1={mitt(n)}
+                  y1={yRubrik - 6}
+                  x2={mitt(n)}
+                  y2={stripBotten + 8}
+                  stroke="var(--linje)"
+                  strokeWidth="1"
+                />
+              </g>
+            ))}
+
+            <line x1={x0} y1={y0} x2={x1} y2={y0} stroke="var(--linje)" strokeWidth="1" />
+
+            {/* No horizontal gridlines: the ceiling and the zero state the scale, and
+                every column states its own value. */}
+            <text
+              x={ranna}
+              y={y1 + 4}
+              textAnchor="end"
+              fontSize="11"
+              fill="var(--dampad)"
+              className="data"
+            >
+              {belopp(tak)}
+            </text>
+            <text
+              x={ranna}
+              y={y0 + 4}
+              textAnchor="end"
+              fontSize="11"
+              fill="var(--dampad)"
+              className="data"
+            >
+              0
+            </text>
+
+            {kolumner.map((k, n) => {
+              const aktiv = hovAr === k.ar;
+              const visaVarde = !glesa || n % 2 === kolumner.length % 2;
+              return (
+                <g key={`kolumn-${k.ar}`}>
+                  {k.total === null ? (
+                    // Nobody filed this year. No column, no zero — a dash where the
+                    // column is not, and every row of the strip below says the same.
+                    <text
+                      x={mitt(n)}
+                      y={y0 - 9}
+                      textAnchor="middle"
+                      fontSize="12"
+                      fill="var(--dampad)"
+                    >
+                      —
+                    </text>
+                  ) : (
+                    <>
+                      <rect
+                        x={mitt(n) - stapelbredd / 2}
+                        y={yAv(k.total)}
+                        width={stapelbredd}
+                        height={Math.max(y0 - yAv(k.total), 1)}
+                        fill="var(--amber)"
+                      />
+                      {visaVarde && (
+                        <text
+                          x={mitt(n)}
+                          y={yAv(k.total) - 9}
+                          textAnchor="middle"
+                          fontSize="12"
+                          fill="var(--black)"
+                          fontWeight={aktiv ? 600 : 400}
+                          className="data"
+                        >
+                          {belopp(k.total)}
+                        </text>
+                      )}
+                    </>
+                  )}
                   <text
                     x={mitt(n)}
-                    y={y0 - 9}
+                    y={yAr}
                     textAnchor="middle"
                     fontSize="12"
-                    fill="var(--dampad)"
+                    fill={aktiv ? "var(--black)" : "var(--dampad)"}
+                    className="data"
                   >
-                    —
+                    {k.ar}
                   </text>
-                ) : (
-                  <>
-                    <rect
-                      x={mitt(n) - stapelbredd / 2}
-                      y={yAv(k.total)}
-                      width={stapelbredd}
-                      height={Math.max(y0 - yAv(k.total), 1)}
-                      fill="var(--amber)"
-                    />
-                    {visaVarde && (
-                      <text
-                        x={mitt(n)}
-                        y={yAv(k.total) - 9}
-                        textAnchor="middle"
-                        fontSize="12"
-                        fill="var(--black)"
-                        fontWeight={aktiv ? 600 : 400}
-                        style={{ fontVariantNumeric: "tabular-nums" }}
-                      >
-                        {belopp(k.total)}
-                      </text>
-                    )}
-                  </>
-                )}
-                <text
-                  x={mitt(n)}
-                  y={yAr}
-                  textAnchor="middle"
-                  fontSize="12"
-                  fill={aktiv ? "var(--black)" : "var(--dampad)"}
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                >
-                  {k.ar}
-                </text>
-              </g>
-            );
-          })}
+                </g>
+              );
+            })}
 
-          <text x={0} y={yRubrik} fontSize="11" letterSpacing="1.6" fill="var(--dampad)">
-            WHO IS IN EACH COLUMN
-          </text>
+            <text x={0} y={yRubrik} fontSize="11" letterSpacing="1.6" fill="var(--dampad)">
+              WHO IS IN EACH COLUMN
+            </text>
 
-          {filare.map((f, rad) => {
-            const y = yStrip + rad * radhojd;
-            return (
-              <g key={`rad-${f.namn}`}>
-                <text
-                  x={ranna}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize="11"
-                  fill="var(--black)"
-                >
-                  {kort(f.namn, 17)}
-                </text>
-                {kolumner.map((k, n) =>
-                  f.punkter.some((p) => p.ar === k.ar) ? (
-                    <circle
-                      key={`m-${k.ar}`}
-                      cx={mitt(n)}
-                      cy={y}
-                      r="3.2"
-                      fill="var(--amber)"
-                    />
-                  ) : (
-                    // Absent, not zero. A short rule reads as "nothing here" where a
-                    // hollow dot would read as a different kind of value.
-                    <line
-                      key={`m-${k.ar}`}
-                      x1={mitt(n) - 3.5}
-                      y1={y}
-                      x2={mitt(n) + 3.5}
-                      y2={y}
-                      stroke="var(--linje)"
-                      strokeWidth="1.5"
-                    />
-                  ),
-                )}
-              </g>
-            );
-          })}
+            {filare.map((f, rad) => {
+              const y = yStrip + rad * radhojd;
+              return (
+                <g key={`rad-${f.namn}`}>
+                  <text
+                    x={ranna}
+                    y={y + 4}
+                    textAnchor="end"
+                    fontSize="11"
+                    fill="var(--black)"
+                  >
+                    {kort(f.namn, 17)}
+                  </text>
+                  {kolumner.map((k, n) =>
+                    f.punkter.some((p) => p.ar === k.ar) ? (
+                      <circle
+                        key={`m-${k.ar}`}
+                        cx={mitt(n)}
+                        cy={y}
+                        r="3.2"
+                        fill="var(--amber)"
+                      />
+                    ) : (
+                      // Absent, not zero. A short rule reads as "nothing here" where a
+                      // hollow dot would read as a different kind of value.
+                      <line
+                        key={`m-${k.ar}`}
+                        x1={mitt(n) - 3.5}
+                        y1={y}
+                        x2={mitt(n) + 3.5}
+                        y2={y}
+                        stroke="var(--ask)"
+                        strokeWidth="1.5"
+                      />
+                    ),
+                  )}
+                </g>
+              );
+            })}
 
-          {/* Enlarged hit targets last, so nothing drawn can swallow the pointer. */}
-          {kolumner.map((k, n) => (
-            <rect
-              key={`traff-${k.ar}`}
-              x={mitt(n) - steg2 / 2}
-              y={y1 - 12}
-              width={steg2}
-              height={stripBotten + 8 - (y1 - 12)}
-              fill="transparent"
-              onMouseEnter={() => sattHovAr(k.ar)}
-              onMouseLeave={() => sattHovAr(null)}
-            />
-          ))}
-        </svg>
+            {/* Enlarged hit targets last, so nothing drawn can swallow the pointer. */}
+            {kolumner.map((k, n) => (
+              <rect
+                key={`traff-${k.ar}`}
+                x={mitt(n) - steg2 / 2}
+                y={y1 - 12}
+                width={steg2}
+                height={stripBotten + 8 - (y1 - 12)}
+                fill="transparent"
+                onMouseEnter={() => sattHovAr(k.ar)}
+                onMouseLeave={() => sattHovAr(null)}
+              />
+            ))}
+          </svg>
+        </div>
       ) : (
         // One year of filings is a figure, not a trend. An empty frame would imply
         // we drew something; say the thing instead.
@@ -653,7 +658,7 @@ function Etableringstabell({
                 key={p.namn}
                 onMouseEnter={() => sattHovNamn(p.namn)}
                 onMouseLeave={() => sattHovNamn(null)}
-                className={`border-b border-linje ${markerad ? "bg-papper-djup" : ""}`}
+                className={`border-b border-linje ${markerad ? "bg-upphojd" : ""}`}
               >
                 <td className={`py-2 pr-3 ${p.egen ? "text-du" : "text-black"}`}>
                   {p.namn}
@@ -663,7 +668,7 @@ function Etableringstabell({
                   {p.ar === null ? (
                     <span className="text-dampad">—</span>
                   ) : (
-                    <span className="siffror text-black">{p.ar}</span>
+                    <span className="data text-black">{p.ar}</span>
                   )}
                 </td>
                 {egenAr !== null && (
@@ -674,7 +679,7 @@ function Etableringstabell({
                     ) : skillnad === 0 ? (
                       <span className="text-dampad">same year</span>
                     ) : (
-                      <span className="siffror text-black">
+                      <span className="data text-black">
                         {skillnad > 0
                           ? `${tal(skillnad)} yr later`
                           : `${tal(-skillnad)} yr earlier`}
@@ -725,10 +730,10 @@ export function Etablering({ konkurrenter, egen = null, egetNamn }: Sektorprops)
   /* Geometry. Rows breathe further apart when there are only a few of them, so
      two companies read as a deliberate timeline rather than a chart that failed
      to fill. */
-  const B = 760;
+  const B = 792;
   const ranna = 168;
   const x0 = 176;
-  const x1 = 700;
+  const x1 = 732;
   const radhojd = daterade.length <= 3 ? 34 : 26;
   const yRad0 = 32;
   const yBas = yRad0 + Math.max(daterade.length - 1, 0) * radhojd + 24;
@@ -800,132 +805,137 @@ export function Etablering({ konkurrenter, egen = null, egetNamn }: Sektorprops)
       {ritbar ? (
         // The table below carries every value, so the drawing is hidden from a screen
         // reader rather than read out as a second, worse copy of the same data.
-        <svg
-          viewBox={`0 0 ${B} ${H}`}
-          width="100%"
-          aria-hidden="true"
-          className="h-auto w-full overflow-visible"
-        >
-          <title>{`Registration year, one row per company, ${minData}–${maxData}`}</title>
+        // Below about 700px a viewBox this wide scales its 12px ticks down to
+        // single figures, so the drawing scrolls at a legible size rather than
+        // shrinking into one. Print still gets the whole width on the page.
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 print:overflow-visible">
+          <svg
+            viewBox={`0 0 ${B} ${H}`}
+            width="100%"
+            aria-hidden="true"
+            className="h-auto w-full min-w-[640px] overflow-visible print:min-w-0"
+          >
+            <title>{`Registration year, one row per company, ${minData}–${maxData}`}</title>
 
-          {/* Recessive first: the hover band, then the grid, then the axis, then data. */}
-          {daterade.map((p, rad) =>
-            hovNamn === p.namn ? (
+            {/* Recessive first: the hover band, then the grid, then the axis, then data. */}
+            {daterade.map((p, rad) =>
+              hovNamn === p.namn ? (
+                <rect
+                  key={`band-${p.namn}`}
+                  x={0}
+                  y={yRad0 + rad * radhojd - radhojd / 2}
+                  width={B}
+                  height={radhojd}
+                  fill="var(--upphojd)"
+                />
+              ) : null,
+            )}
+
+            {ticks.map((t) => (
+              <line
+                key={`rutnat-${t}`}
+                x1={xAv(t)}
+                y1={12}
+                x2={xAv(t)}
+                y2={yBas}
+                stroke="var(--linje)"
+                strokeWidth="1"
+              />
+            ))}
+            <line x1={x0} y1={yBas} x2={x1} y2={yBas} stroke="var(--linje)" strokeWidth="1" />
+
+            {ticks.map((t) => (
+              <text
+                key={`tick-${t}`}
+                x={xAv(t)}
+                y={yBas + 20}
+                textAnchor="middle"
+                fontSize="12"
+                fill="var(--dampad)"
+                className="data"
+              >
+                {t}
+              </text>
+            ))}
+            <text
+              x={(x0 + x1) / 2}
+              y={yBas + 44}
+              textAnchor="middle"
+              fontSize="11"
+              letterSpacing="1.6"
+              fill="var(--dampad)"
+            >
+              YEAR REGISTERED
+            </text>
+
+            {daterade.map((p, rad) => {
+              const y = yRad0 + rad * radhojd;
+              const x = xAv(p.ar);
+              const aktiv = hovNamn === p.namn;
+              const farg = p.egen ? "var(--du)" : "var(--amber)";
+              return (
+                <g key={`entre-${p.namn}`}>
+                  <title>{`${p.namn} — registered ${p.ar}`}</title>
+                  {/* A leader from the name to its dot. The rows are far apart and the
+                      axis is wide; without it the eye loses the row halfway across.
+                      The oldest company can sit on the axis start, where there is no
+                      distance to lead across and a line would double back. */}
+                  {x - 9 > ranna + 10 && (
+                    <line
+                      x1={ranna + 8}
+                      y1={y}
+                      x2={x - 9}
+                      y2={y}
+                      stroke="var(--linje)"
+                      strokeWidth="1"
+                    />
+                  )}
+                  <text
+                    x={ranna}
+                    y={y + 4}
+                    textAnchor="end"
+                    fontSize="13"
+                    fill={p.egen ? "var(--du)" : "var(--black)"}
+                    fontWeight={aktiv ? 600 : 400}
+                  >
+                    {kort(p.namn, 22)}
+                  </text>
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={aktiv ? 7 : 5.5}
+                    fill={farg}
+                    stroke="var(--halo)"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={x + 13}
+                    y={y + 4}
+                    fontSize="12"
+                    fill={p.egen ? "var(--du)" : "var(--dampad)"}
+                    className="data"
+                  >
+                    {p.ar}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Enlarged hit targets last, so nothing drawn can swallow the pointer. */}
+            {daterade.map((p, rad) => (
               <rect
-                key={`band-${p.namn}`}
+                key={`traff-${p.namn}`}
                 x={0}
                 y={yRad0 + rad * radhojd - radhojd / 2}
                 width={B}
                 height={radhojd}
-                fill="var(--papper-djup)"
+                fill="transparent"
+                onMouseEnter={() => sattHovNamn(p.namn)}
+                onMouseLeave={() => sattHovNamn(null)}
               />
-            ) : null,
-          )}
-
-          {ticks.map((t) => (
-            <line
-              key={`rutnat-${t}`}
-              x1={xAv(t)}
-              y1={12}
-              x2={xAv(t)}
-              y2={yBas}
-              stroke="var(--linje)"
-              strokeWidth="1"
-            />
-          ))}
-          <line x1={x0} y1={yBas} x2={x1} y2={yBas} stroke="var(--linje)" strokeWidth="1" />
-
-          {ticks.map((t) => (
-            <text
-              key={`tick-${t}`}
-              x={xAv(t)}
-              y={yBas + 20}
-              textAnchor="middle"
-              fontSize="12"
-              fill="var(--dampad)"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {t}
-            </text>
-          ))}
-          <text
-            x={(x0 + x1) / 2}
-            y={yBas + 44}
-            textAnchor="middle"
-            fontSize="11"
-            letterSpacing="1.6"
-            fill="var(--dampad)"
-          >
-            YEAR REGISTERED
-          </text>
-
-          {daterade.map((p, rad) => {
-            const y = yRad0 + rad * radhojd;
-            const x = xAv(p.ar);
-            const aktiv = hovNamn === p.namn;
-            const farg = p.egen ? "var(--du)" : "var(--amber)";
-            return (
-              <g key={`entre-${p.namn}`}>
-                <title>{`${p.namn} — registered ${p.ar}`}</title>
-                {/* A leader from the name to its dot. The rows are far apart and the
-                    axis is wide; without it the eye loses the row halfway across.
-                    The oldest company can sit on the axis start, where there is no
-                    distance to lead across and a line would double back. */}
-                {x - 9 > ranna + 10 && (
-                  <line
-                    x1={ranna + 8}
-                    y1={y}
-                    x2={x - 9}
-                    y2={y}
-                    stroke="var(--linje)"
-                    strokeWidth="1"
-                  />
-                )}
-                <text
-                  x={ranna}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize="13"
-                  fill={p.egen ? "var(--du)" : "var(--black)"}
-                  fontWeight={aktiv ? 600 : 400}
-                >
-                  {kort(p.namn, 22)}
-                </text>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={aktiv ? 7 : 5.5}
-                  fill={farg}
-                  stroke="var(--papper)"
-                  strokeWidth="2"
-                />
-                <text
-                  x={x + 13}
-                  y={y + 4}
-                  fontSize="12"
-                  fill={p.egen ? "var(--du)" : "var(--dampad)"}
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                >
-                  {p.ar}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Enlarged hit targets last, so nothing drawn can swallow the pointer. */}
-          {daterade.map((p, rad) => (
-            <rect
-              key={`traff-${p.namn}`}
-              x={0}
-              y={yRad0 + rad * radhojd - radhojd / 2}
-              width={B}
-              height={radhojd}
-              fill="transparent"
-              onMouseEnter={() => sattHovNamn(p.namn)}
-              onMouseLeave={() => sattHovNamn(null)}
-            />
-          ))}
-        </svg>
+            ))}
+          </svg>
+        </div>
       ) : (
         // One dot is not a timeline, and no dots is not a chart. Say the thing.
         <p className="text-[15px] leading-relaxed text-dampad">
@@ -976,13 +986,17 @@ export default function Sektor({ konkurrenter, egen = null, egetNamn }: Sektorpr
         <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
           Sector revenue over time
         </h2>
-        <Sektorintakt konkurrenter={konkurrenter} egen={egen} egetNamn={egetNamn} />
+        <div className="konsolkort p-4 sm:p-5">
+          <Sektorintakt konkurrenter={konkurrenter} egen={egen} egetNamn={egetNamn} />
+        </div>
       </section>
       <section className="flex flex-col gap-4">
         <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
           When your competitors appeared
         </h2>
-        <Etablering konkurrenter={konkurrenter} egen={egen} egetNamn={egetNamn} />
+        <div className="konsolkort p-4 sm:p-5">
+          <Etablering konkurrenter={konkurrenter} egen={egen} egetNamn={egetNamn} />
+        </div>
       </section>
     </div>
   );

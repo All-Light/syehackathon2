@@ -49,12 +49,12 @@ export default function Epost({ id, epost }: { id: string; epost?: string | null
 
   if (sparad && !redigerar) {
     return (
-      <section className="ej-tryck flex flex-col gap-2 border-t border-linje pt-8">
+      <section className="ej-tryck konsolkort flex flex-col gap-2 p-5">
         <p className="text-[15px] text-black">
           <span className="text-dampad">Attached to this report: </span>
-          {sparad}
+          <span className="data">{sparad}</span>
         </p>
-        <p className="text-sm text-dampad">
+        <p className="text-sm leading-relaxed text-dampad">
           Stored with the report. Nothing is sent — it is here so this work can be found
           again if the link goes missing.
         </p>
@@ -65,7 +65,7 @@ export default function Epost({ id, epost }: { id: string; epost?: string | null
             sattVarde(sparad);
             sattFel(null);
           }}
-          className="self-start text-sm text-amber underline-offset-4 transition-colors hover:text-black hover:underline"
+          className="self-start pt-1 text-sm text-amber underline-offset-4 transition-colors hover:text-black hover:underline"
         >
           Use a different address
         </button>
@@ -74,10 +74,10 @@ export default function Epost({ id, epost }: { id: string; epost?: string | null
   }
 
   return (
-    <section className="ej-tryck flex flex-col gap-4 border-t border-linje pt-8">
+    <section className="ej-tryck konsolkort flex flex-col gap-5 p-5">
       <div className="flex flex-col gap-2">
-        <h2 className="font-serif text-2xl text-black">Keep a way back to this report.</h2>
-        <p className="max-w-lg text-[15px] text-dampad">
+        <h2 className="rubrik text-[20px]">Keep a way back to this report.</h2>
+        <p className="max-w-lg text-[15px] leading-relaxed text-kropp">
           There is no sign-up, so this link is your only copy. Leave your address and it is
           stored with the report — nothing is sent.
         </p>
@@ -90,6 +90,8 @@ export default function Epost({ id, epost }: { id: string; epost?: string | null
           Your email
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
+          {/* Their input spec: transparent ground inside a hairline pill, so a
+              field is a shape rather than a second surface on the card. */}
           <input
             id={faltId}
             type="email"
@@ -99,17 +101,21 @@ export default function Epost({ id, epost }: { id: string; epost?: string | null
             value={varde}
             onChange={(e) => sattVarde(e.target.value)}
             placeholder="you@company.com"
-            className="flex-1 border border-linje bg-transparent px-4 py-3 text-black placeholder:text-dampad/60 focus:border-amber focus:outline-none sm:max-w-sm"
+            className="flex-1 rounded-full border border-harlinje-stark bg-transparent px-4 py-2.5 text-[14px] text-black placeholder:text-dampad/70 focus:border-amber focus:outline-none sm:max-w-sm"
           />
+          {/* The one filled action in this region — the role their lavender
+              carries, in our amber. Text on it is always the ground colour. */}
           <button
             type="submit"
             disabled={laddar || !varde.trim()}
-            className="bg-amber px-5 py-2.5 text-sm text-papper transition-colors hover:bg-black disabled:opacity-50"
+            className={`rounded-full bg-amber px-5 py-2.5 text-[13px] font-semibold text-papper transition-colors hover:bg-amber-tryckt disabled:opacity-50 ${
+              laddar ? "sveplinje" : ""
+            }`}
           >
             {laddar ? "Saving…" : "Attach to this report"}
           </button>
         </div>
-        {fel && <p className="text-sm text-rod">{fel}</p>}
+        {fel && <p className="text-sm text-hog">{fel}</p>}
       </form>
     </section>
   );

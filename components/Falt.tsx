@@ -56,9 +56,14 @@ export type Faltprops = {
    The two marks that must out-rank it are mixed from --dampad rather than given
    new tokens: a missing year has to be louder than a year that is merely there,
    and the 100 line is the reference the whole chart is read against.
+
+   Both mixes are of --dampad, so both invert with the ground and the ranking
+   survives the switch. The baseline was 50% on paper; on the night card that
+   landed at 2.4:1, under the floor for a mark the whole chart is read against,
+   so it is 62% now — 3.19:1 there, and still recessive on paper.
    --------------------------------------------------------------------------- */
 const HAL = "color-mix(in oklab, var(--dampad) 35%, transparent)";
-const BAS = "color-mix(in oklab, var(--dampad) 50%, transparent)";
+const BAS = "color-mix(in oklab, var(--dampad) 62%, transparent)";
 
 /* ---------------------------------------------------------------------------
    Ticks on a ratio scale. snyggtSteg() picks a constant step, and a constant
@@ -174,7 +179,7 @@ function Falttabell({
     return v === null ? (
       <span className="text-dampad">—</span>
     ) : (
-      <span className="siffror text-black">{tal(v)}</span>
+      <span className="data text-black">{tal(v)}</span>
     );
   }
 
@@ -191,7 +196,7 @@ function Falttabell({
             <th className="py-2 pr-3 font-normal">Company</th>
             <th className="py-2 pr-3 font-normal">Figure</th>
             {ar.map((a) => (
-              <th key={a} className="siffror py-2 pl-3 text-right font-normal">
+              <th key={a} className="data py-2 pl-3 text-right font-normal">
                 {a}
               </th>
             ))}
@@ -207,7 +212,7 @@ function Falttabell({
                 onMouseEnter={() => sattHovrad(r.id)}
                 onMouseLeave={() => sattHovrad(null)}
                 className={`${typ === "index" ? "border-b border-linje" : ""} ${
-                  markerad ? "bg-papper-djup" : ""
+                  markerad ? "bg-upphojd" : ""
                 }`}
               >
                 {typ === "tkr" ? (
@@ -247,7 +252,7 @@ function Falttabell({
                 })}
                 <td className="py-2 pl-3 text-right">
                   {typ === "tkr" && r.analys.totalt !== null ? (
-                    <span className="siffror text-black">{procent(r.analys.totalt)}</span>
+                    <span className="data text-black">{procent(r.analys.totalt)}</span>
                   ) : (
                     <span className="text-dampad">—</span>
                   )}
@@ -307,13 +312,15 @@ export default function Falt({ konkurrenter, egen = null, egetNamn }: Faltprops)
   // reader's own line on top of them.
   const ritordning = [...ritbara.filter((r) => !r.egen), ...ritbara.filter((r) => r.egen)];
 
-  // The viewBox is sized to the band it renders in (max-w-3xl less padding, so
-  // about 720px) rather than picked round: at 1:1 a 13px label is 13px on screen,
-  // and every type size in this exhibit matches the ones in the report.
-  const B = 720;
+  // The viewBox is sized to the band it renders in — now the inside of a console
+  // card in an 880px column, so about 792px — rather than picked round: at 1:1 a
+  // 13px label is 13px on screen, and every type size in this exhibit matches the
+  // ones in the report. The right margin stays 154 units, which is the label
+  // column; only the plot got the extra width.
+  const B = 792;
   const H = 442;
   const x0 = 46;
-  const x1 = 566;
+  const x1 = 638;
   const y1 = 58;
   const y0 = 374;
 
@@ -369,239 +376,244 @@ export default function Falt({ konkurrenter, egen = null, egetNamn }: Faltprops)
       {medLinje.length > 0 ? (
         // The table below carries every value, so the drawing is hidden from a screen
         // reader rather than read out as a second, worse copy of the same data.
-        <svg
-          viewBox={`0 0 ${B} ${H}`}
-          width="100%"
-          aria-hidden="true"
-          className="h-auto w-full overflow-visible"
-        >
-          {/* Recessive first: grid, then the axis, then the data over both. */}
-          {arRit.map((a) =>
-            halAr.includes(a) ? null : (
+        // Below about 700px a viewBox this wide scales its 12px ticks down to
+        // single figures, so the drawing scrolls at a legible size rather than
+        // shrinking into one. Print still gets the whole width on the page.
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 print:overflow-visible">
+          <svg
+            viewBox={`0 0 ${B} ${H}`}
+            width="100%"
+            aria-hidden="true"
+            className="h-auto w-full min-w-[640px] overflow-visible print:min-w-0"
+          >
+            {/* Recessive first: grid, then the axis, then the data over both. */}
+            {arRit.map((a) =>
+              halAr.includes(a) ? null : (
+                <line
+                  key={`rutnat-${a}`}
+                  x1={xAv(a)}
+                  y1={y1 - 8}
+                  x2={xAv(a)}
+                  y2={y0}
+                  stroke="var(--linje)"
+                  strokeWidth="1"
+                />
+              ),
+            )}
+            {halAr.map((a) => (
               <line
-                key={`rutnat-${a}`}
+                key={`hal-${a}`}
                 x1={xAv(a)}
                 y1={y1 - 8}
                 x2={xAv(a)}
                 y2={y0}
-                stroke="var(--linje)"
+                stroke={HAL}
                 strokeWidth="1"
+                strokeDasharray="2 5"
               />
-            ),
-          )}
-          {halAr.map((a) => (
-            <line
-              key={`hal-${a}`}
-              x1={xAv(a)}
-              y1={y1 - 8}
-              x2={xAv(a)}
-              y2={y0}
-              stroke={HAL}
-              strokeWidth="1"
-              strokeDasharray="2 5"
-            />
-          ))}
+            ))}
 
-          {/* The one baseline: 100 is where every company starts, so it is the
-              line the whole chart is read against — not the bottom of the box. */}
-          <line x1={x0} y1={yBas} x2={x1} y2={yBas} stroke={BAS} strokeWidth="1" />
+            {/* The one baseline: 100 is where every company starts, so it is the
+                line the whole chart is read against — not the bottom of the box. */}
+            <line x1={x0} y1={yBas} x2={x1} y2={yBas} stroke={BAS} strokeWidth="1" />
 
-          {yTickar.map((v) =>
-            // A tick sitting on top of the 100 label would print the reference twice.
-            Math.abs(yAv(v) - yBas) < 12 ? null : (
+            {yTickar.map((v) =>
+              // A tick sitting on top of the 100 label would print the reference twice.
+              Math.abs(yAv(v) - yBas) < 12 ? null : (
+                <text
+                  key={`ytick-${v}`}
+                  x={x0 - 10}
+                  y={yAv(v) + 4}
+                  textAnchor="end"
+                  fontSize="12"
+                  fill="var(--dampad)"
+                  className="data"
+                >
+                  {tal(v)}
+                </text>
+              ),
+            )}
+            <text
+              x={x0 - 10}
+              y={yBas + 4}
+              textAnchor="end"
+              fontSize="12"
+              fill="var(--black)"
+              className="data"
+            >
+              100
+            </text>
+
+            {arRit.map((a) => (
               <text
-                key={`ytick-${v}`}
-                x={x0 - 10}
-                y={yAv(v) + 4}
-                textAnchor="end"
+                key={`artick-${a}`}
+                x={xAv(a)}
+                y={y0 + 22}
+                textAnchor="middle"
                 fontSize="12"
                 fill="var(--dampad)"
-                style={{ fontVariantNumeric: "tabular-nums" }}
+                className="data"
               >
-                {tal(v)}
+                {a}
               </text>
-            ),
-          )}
-          <text
-            x={x0 - 10}
-            y={yBas + 4}
-            textAnchor="end"
-            fontSize="12"
-            fill="var(--black)"
-            style={{ fontVariantNumeric: "tabular-nums" }}
-          >
-            100
-          </text>
-
-          {arRit.map((a) => (
+            ))}
             <text
-              key={`artick-${a}`}
-              x={xAv(a)}
-              y={y0 + 22}
+              x={(x0 + x1) / 2}
+              y={y0 + 46}
               textAnchor="middle"
-              fontSize="12"
+              fontSize="11"
+              letterSpacing="1.6"
               fill="var(--dampad)"
-              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              {a}
+              FILED FINANCIAL YEAR
             </text>
-          ))}
-          <text
-            x={(x0 + x1) / 2}
-            y={y0 + 46}
-            textAnchor="middle"
-            fontSize="11"
-            letterSpacing="1.6"
-            fill="var(--dampad)"
-          >
-            FILED FINANCIAL YEAR
-          </text>
 
-          {/* Said on the axis, not only in the caption. A reader can get two things
-              wrong here — that the numbers are kronor, and that the spacing up the
-              side is even — so both are answered before the first line is looked at,
-              in words an owner rather than an analyst would use. */}
-          <text x={0} y={y1 - 38} fontSize="11" letterSpacing="1.6" fill="var(--dampad)">
-            INDEX — EACH COMPANY&rsquo;S OWN FIRST FILED YEAR = 100
-          </text>
-          <text x={0} y={y1 - 20} fontSize="11.5" fill="var(--dampad)">
-            {`Equal slopes mean equal growth: a doubling is the same height anywhere. Starts at ${tal(golv)}, not zero.`}
-          </text>
+            {/* Said on the axis, not only in the caption. A reader can get two things
+                wrong here — that the numbers are kronor, and that the spacing up the
+                side is even — so both are answered before the first line is looked at,
+                in words an owner rather than an analyst would use. */}
+            <text x={0} y={y1 - 38} fontSize="11" letterSpacing="1.6" fill="var(--dampad)">
+              INDEX — EACH COMPANY&rsquo;S OWN FIRST FILED YEAR = 100
+            </text>
+            <text x={0} y={y1 - 20} fontSize="11.5" fill="var(--dampad)">
+              {`Equal slopes mean equal growth: a doubling is the same height anywhere. Starts at ${tal(golv)}, not zero.`}
+            </text>
 
-          {ritordning.map((r, n) => {
-            const aktiv = hovrad === r.id;
-            const fardg = r.egen ? "var(--du)" : "var(--amber)";
-            const tjocklek = r.egen ? 2.75 : 2;
-            const sist = r.indexerade[r.indexerade.length - 1];
-            const pengar = r.analys.punkter[r.analys.punkter.length - 1];
-            return (
-              <g
-                key={r.id}
-                onMouseEnter={() => sattHovrad(r.id)}
-                onMouseLeave={() => sattHovrad(null)}
-                // Dimming the rest is the cheapest way to follow one line out of six.
-                style={{
-                  opacity: hovrad === null || aktiv ? 1 : 0.3,
-                  transition: "opacity 160ms ease",
-                }}
-              >
-                <title>
-                  {`${r.analys.namn} — ${belopp(pengar.v)} in ${pengar.ar}, index ${tal(sist.v)}`}
-                </title>
-                {r.bitar.map((bit, i) => {
-                  if (bit.length < 2) return null;
-                  const koord = bit.map((p) => ({ x: xAv(p.ar), y: yAv(p.v) }));
-                  const punkter = koord.map((p) => `${p.x},${p.y}`).join(" ");
-                  return (
-                    <g key={`bit-${i}`}>
-                      <polyline
-                        className="drag"
-                        points={punkter}
-                        fill="none"
-                        stroke={fardg}
-                        strokeWidth={aktiv ? tjocklek + 1 : tjocklek}
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                        style={dragstil(banlangd(koord), n)}
+            {ritordning.map((r, n) => {
+              const aktiv = hovrad === r.id;
+              const fardg = r.egen ? "var(--du)" : "var(--amber)";
+              const tjocklek = r.egen ? 2.75 : 2;
+              const sist = r.indexerade[r.indexerade.length - 1];
+              const pengar = r.analys.punkter[r.analys.punkter.length - 1];
+              return (
+                <g
+                  key={r.id}
+                  onMouseEnter={() => sattHovrad(r.id)}
+                  onMouseLeave={() => sattHovrad(null)}
+                  // Dimming the rest is the cheapest way to follow one line out of six.
+                  style={{
+                    opacity: hovrad === null || aktiv ? 1 : 0.3,
+                    transition: "opacity 160ms ease",
+                  }}
+                >
+                  <title>
+                    {`${r.analys.namn} — ${belopp(pengar.v)} in ${pengar.ar}, index ${tal(sist.v)}`}
+                  </title>
+                  {r.bitar.map((bit, i) => {
+                    if (bit.length < 2) return null;
+                    const koord = bit.map((p) => ({ x: xAv(p.ar), y: yAv(p.v) }));
+                    const punkter = koord.map((p) => `${p.x},${p.y}`).join(" ");
+                    return (
+                      <g key={`bit-${i}`}>
+                        <polyline
+                          className="drag"
+                          points={punkter}
+                          fill="none"
+                          stroke={fardg}
+                          strokeWidth={aktiv ? tjocklek + 1 : tjocklek}
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          style={dragstil(banlangd(koord), n)}
+                        />
+                        {/* A 2px line is not a hover target. */}
+                        <polyline
+                          points={punkter}
+                          fill="none"
+                          stroke="transparent"
+                          strokeWidth="20"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                        />
+                      </g>
+                    );
+                  })}
+                  {r.indexerade.map((p, i) => {
+                    const slut = i === r.indexerade.length - 1;
+                    // A single filed year has no line, so the dot is the whole record
+                    // of it and must survive on its own.
+                    const ensam = r.indexerade.length === 1;
+                    return (
+                      <circle
+                        key={`p-${p.ar}`}
+                        cx={xAv(p.ar)}
+                        cy={yAv(p.v)}
+                        r={slut ? (aktiv ? 5.5 : ensam ? 5 : 4.5) : 2.5}
+                        fill={fardg}
+                        stroke={slut ? "var(--halo)" : "none"}
+                        strokeWidth={slut ? 2 : 0}
                       />
-                      {/* A 2px line is not a hover target. */}
-                      <polyline
-                        points={punkter}
-                        fill="none"
-                        stroke="transparent"
-                        strokeWidth="20"
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      />
-                    </g>
-                  );
-                })}
-                {r.indexerade.map((p, i) => {
-                  const slut = i === r.indexerade.length - 1;
-                  // A single filed year has no line, so the dot is the whole record
-                  // of it and must survive on its own.
-                  const ensam = r.indexerade.length === 1;
-                  return (
-                    <circle
-                      key={`p-${p.ar}`}
-                      cx={xAv(p.ar)}
-                      cy={yAv(p.v)}
-                      r={slut ? (aktiv ? 5.5 : ensam ? 5 : 4.5) : 2.5}
-                      fill={fardg}
-                      stroke={slut ? "var(--papper)" : "none"}
-                      strokeWidth={slut ? 2 : 0}
+                    );
+                  })}
+                </g>
+              );
+            })}
+
+            {etiketter.map(({ r, x, yPunkt, ey }) => {
+              const aktiv = hovrad === r.id;
+              const pengar = r.analys.punkter[r.analys.punkter.length - 1];
+              const namn = kort(r.analys.namn);
+              const summa = belopp(pengar.v);
+              // Rough advance widths at 13px and 11px. kort() truncates by character
+              // count, so a name of wide glyphs can still outrun the margin; then the
+              // label turns back over the plot rather than off the edge of the figure.
+              const bredd = Math.max(namn.length * 6.9, summa.length * 5.8);
+              const vand = etikettX + bredd > B - 4;
+              const ex = vand ? x1 - 8 : etikettX;
+              // A leader wherever the label is not already sitting on its point —
+              // nudged off it vertically, or standing right of a line that stopped
+              // filing early.
+              const leder = Math.abs(ey - yPunkt) > 4 || x < x1 - 6;
+              return (
+                <g
+                  key={`etikett-${r.id}`}
+                  onMouseEnter={() => sattHovrad(r.id)}
+                  onMouseLeave={() => sattHovrad(null)}
+                  style={{
+                    opacity: hovrad === null || aktiv ? 1 : 0.3,
+                    transition: "opacity 160ms ease",
+                  }}
+                >
+                  {leder && !vand && (
+                    <polyline
+                      points={`${x + 8},${yPunkt} ${ex - 6},${yPunkt} ${ex - 6},${ey - 4}`}
+                      fill="none"
+                      stroke="var(--linje)"
+                      strokeWidth="1"
                     />
-                  );
-                })}
-              </g>
-            );
-          })}
-
-          {etiketter.map(({ r, x, yPunkt, ey }) => {
-            const aktiv = hovrad === r.id;
-            const pengar = r.analys.punkter[r.analys.punkter.length - 1];
-            const namn = kort(r.analys.namn);
-            const summa = belopp(pengar.v);
-            // Rough advance widths at 13px and 11px. kort() truncates by character
-            // count, so a name of wide glyphs can still outrun the margin; then the
-            // label turns back over the plot rather than off the edge of the figure.
-            const bredd = Math.max(namn.length * 6.9, summa.length * 5.8);
-            const vand = etikettX + bredd > B - 4;
-            const ex = vand ? x1 - 8 : etikettX;
-            // A leader wherever the label is not already sitting on its point —
-            // nudged off it vertically, or standing right of a line that stopped
-            // filing early.
-            const leder = Math.abs(ey - yPunkt) > 4 || x < x1 - 6;
-            return (
-              <g
-                key={`etikett-${r.id}`}
-                onMouseEnter={() => sattHovrad(r.id)}
-                onMouseLeave={() => sattHovrad(null)}
-                style={{
-                  opacity: hovrad === null || aktiv ? 1 : 0.3,
-                  transition: "opacity 160ms ease",
-                }}
-              >
-                {leder && !vand && (
-                  <polyline
-                    points={`${x + 8},${yPunkt} ${ex - 6},${yPunkt} ${ex - 6},${ey - 4}`}
-                    fill="none"
-                    stroke="var(--linje)"
-                    strokeWidth="1"
+                  )}
+                  <text
+                    x={ex}
+                    y={ey}
+                    textAnchor={vand ? "end" : "start"}
+                    fontSize="13"
+                    fill={r.egen ? "var(--du)" : "var(--black)"}
+                    fontWeight={r.egen || aktiv ? 600 : 400}
+                  >
+                    {namn}
+                  </text>
+                  {/* Indexing throws absolute size away; the second line hands it back. */}
+                  <text
+                    x={ex}
+                    y={ey + 15}
+                    textAnchor={vand ? "end" : "start"}
+                    fontSize="11"
+                    fill="var(--dampad)"
+                    className="data"
+                  >
+                    {summa}
+                  </text>
+                  <rect
+                    x={vand ? ex - bredd - 6 : ex - 6}
+                    y={ey - 14}
+                    width={bredd + 12}
+                    height={33}
+                    fill="transparent"
                   />
-                )}
-                <text
-                  x={ex}
-                  y={ey}
-                  textAnchor={vand ? "end" : "start"}
-                  fontSize="13"
-                  fill={r.egen ? "var(--du)" : "var(--black)"}
-                  fontWeight={r.egen || aktiv ? 600 : 400}
-                >
-                  {namn}
-                </text>
-                {/* Indexing throws absolute size away; the second line hands it back. */}
-                <text
-                  x={ex}
-                  y={ey + 15}
-                  textAnchor={vand ? "end" : "start"}
-                  fontSize="11"
-                  fill="var(--dampad)"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                >
-                  {summa}
-                </text>
-                <rect
-                  x={vand ? ex - bredd - 6 : ex - 6}
-                  y={ey - 14}
-                  width={bredd + 12}
-                  height={33}
-                  fill="transparent"
-                />
-              </g>
-            );
-          })}
-        </svg>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       ) : (
         // An empty frame would imply we drew something. Say the thing instead.
         <p className="text-[15px] leading-relaxed text-dampad">
