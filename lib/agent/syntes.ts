@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { struktur } from "../llm";
 import type { Foretag, Konkurrent, Namngiven, Rapport } from "../types";
+import { enPerKalla } from "../citat";
 import { sprakFor } from "./sprak";
 
 const Insikt = z.object({
@@ -68,6 +69,12 @@ ${konkurrenter.map(beskriv).join("\n\n")}
   two of the three competitors hide theirs".
 - "citat" and "kallURL": a verbatim quote and URL from the material above that
   supports the claim, when one exists. Otherwise null. NEVER invent a quote.
+- A quote is evidence, not content. Keep every "citat" under 20 words, in the
+  words of the page, and never more than one quote from the same page.
+- If you are not confident which page a statement came from, set the source to
+  null. An unattributed finding is honest; a guessed attribution is not.
+- Never reproduce a page's text at length. Summarise in your own words and let
+  the short quote carry the proof.
 
 Answer with ONLY valid JSON, no prose, no markdown fence:
 {"sammanfattning":"","hot":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"luckor":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"atgarder":[]}`;
@@ -85,8 +92,8 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
     egen,
     konkurrenter,
     ovriga,
-    hot: ut.hot.slice(0, 4).map(insikt),
-    luckor: ut.luckor.slice(0, 4).map(insikt),
+    hot: enPerKalla(ut.hot.slice(0, 4).map(insikt)),
+    luckor: enPerKalla(ut.luckor.slice(0, 4).map(insikt)),
     atgarder: ut.atgarder.slice(0, 3),
   };
 }

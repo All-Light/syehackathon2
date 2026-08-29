@@ -5,6 +5,7 @@ import { struktur } from "../llm";
 import type { BevakadSida, Konkurrent, Prisniva, SidTyp } from "../types";
 import type { Kandidat } from "./upptack";
 import { hamtaOrgdata } from "./orgdata";
+import { kortaCitat } from "../citat";
 import { sprakInstruktion } from "./sprak";
 
 const KonkurrentSchema = z.object({
@@ -139,6 +140,14 @@ ${levande
 - "positionering": one sentence on how they present themselves.
 - "malgrupp": who they are selling to.
 
+# Quoting
+- A quote is evidence, not content. Keep every "citat" under 20 words, in the
+  words of the page, and never more than one quote from the same page.
+- If you are not confident which page a statement came from, set the source to
+  null. An unattributed finding is honest; a guessed attribution is not.
+- Never reproduce a page's text at length. Summarise in your own words and let
+  the short quote carry the proof.
+
 Answer with ONLY valid JSON, no prose, no markdown fence:
 {"positionering":"","malgrupp":"","priser":[{"namn":"","pris":"","period":null,"citat":"","kallURL":""}],"funktioner":[],"styrkor":[],"svagheter":[]}`,
     KonkurrentSchema,
@@ -172,7 +181,7 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
         namn: p.namn,
         pris: p.pris,
         period: p.period,
-        kalla: { url: p.kallURL, citat: p.citat },
+        kalla: { url: p.kallURL, citat: kortaCitat(p.citat) },
       })),
     funktioner: detaljer.funktioner.slice(0, 8),
     styrkor: detaljer.styrkor.slice(0, 4),

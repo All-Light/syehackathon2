@@ -10,6 +10,7 @@ import type {
   Vinkel,
   VinkelId,
 } from "../types";
+import { enPerKalla } from "../citat";
 import { sprakInstruktion } from "./sprak";
 
 /**
@@ -126,6 +127,14 @@ Report what the material actually supports. Rules:
   and "kallURL" the page it came from. Both null if you are inferring rather
   than quoting — but never invent a quote.
 - Ignore anything that is about a different company with a similar name.
+
+# Quoting
+- A quote is evidence, not content. Keep every "citat" under 20 words, in the
+  words of the page, and never more than one quote from the same page.
+- If you are not confident which page a statement came from, set the source to
+  null. An unattributed finding is honest; a guessed attribution is not.
+- Never reproduce a page's text at length. Summarise in your own words and let
+  the short quote carry the proof.
 ${sprakInstruktion(svensk)}
 
 Answer with ONLY valid JSON, no prose, no markdown fence:
@@ -140,10 +149,12 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
   return {
     id: vinkel.id,
     rubrik: vinkel.rubrik,
-    fynd: ut.fynd.slice(0, 6).map((f) => ({
-      text: f.text,
-      kalla: f.citat && f.kallURL ? { url: f.kallURL, citat: f.citat } : null,
-    })),
+    fynd: enPerKalla(
+      ut.fynd.slice(0, 6).map((f) => ({
+        text: f.text,
+        kalla: f.citat && f.kallURL ? { url: f.kallURL, citat: f.citat } : null,
+      })),
+    ),
   };
 }
 
@@ -268,8 +279,8 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
     sammanfattning: dossier.sammanfattning,
     affarsmodell: dossier.affarsmodell,
     intaktsmodell: dossier.intaktsmodell,
-    battre: dossier.battre.slice(0, 5).map(insikt),
-    samre: dossier.samre.slice(0, 5).map(insikt),
+    battre: enPerKalla(dossier.battre.slice(0, 5).map(insikt)),
+    samre: enPerKalla(dossier.samre.slice(0, 5).map(insikt)),
     taktik: dossier.taktik.slice(0, 4),
     vinklar,
     skrivenAv: await skrivandeModell(),
