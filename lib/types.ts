@@ -29,6 +29,36 @@ export type BevakadSida = {
   hamtad: string;
 };
 
+/** One research angle's findings, each tied to where it came from. */
+export type Fynd = { text: string; kalla: Kalla | null };
+
+export type VinkelId = "affarsmodell" | "produkt" | "malgrupp" | "rykte" | "bolag";
+
+export type Vinkel = {
+  id: VinkelId;
+  rubrik: string;
+  fynd: Fynd[];
+};
+
+/**
+ * A deep dive on one competitor: several researchers working different angles
+ * in parallel, then one writer turning what they found into a picture of how
+ * that company actually makes money and where it beats or loses to us.
+ */
+export type Djupdykning = {
+  skapad: string;
+  sammanfattning: string;
+  affarsmodell: string;
+  intaktsmodell: string;
+  /** Where they are ahead of us, and where we are ahead of them. */
+  battre: Insikt[];
+  samre: Insikt[];
+  taktik: string[];
+  vinklar: Vinkel[];
+  /** Which model wrote it, so the report can say. */
+  skrivenAv: string;
+};
+
 export type Konkurrent = {
   namn: string;
   url: string;
@@ -42,6 +72,8 @@ export type Konkurrent = {
   svagheter: string[];
   orgdata: Orgdata | null;
   sidor: BevakadSida[];
+  /** Absent until someone asks for the deep dive — it costs real research. */
+  djup?: Djupdykning | null;
 };
 
 export type Foretag = {
@@ -93,6 +125,13 @@ export type Handelse =
   | { typ: "konkurrent"; konkurrent: Konkurrent }
   | { typ: "profil"; egen: Foretag }
   | { typ: "klar"; rapport: Rapport; id: string | null }
+  | { typ: "fel"; text: string };
+
+/** Streamed while the deep-dive researchers work. */
+export type DjupHandelse =
+  | { typ: "steg"; text: string }
+  | { typ: "vinkel"; vinkel: Vinkel }
+  | { typ: "klar"; djup: Djupdykning }
   | { typ: "fel"; text: string };
 
 /** A monitoring run: what changed on the pages we baselined. */

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Betala from "@/components/Betala";
+import Djupdyk from "@/components/Djupdyk";
 import Lyssna from "@/components/Lyssna";
 import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
 
@@ -58,7 +59,7 @@ function Insikter({ rubrik, poster }: { rubrik: string; poster: Insikt[] }) {
   );
 }
 
-function Kort({ k }: { k: Konkurrent }) {
+function Kort({ k, id }: { k: Konkurrent; id: string | null }) {
   return (
     <article className="flex flex-col gap-4 border border-linje bg-papper-djup/50 p-5">
       <header className="flex flex-col gap-2">
@@ -140,6 +141,12 @@ function Kort({ k }: { k: Konkurrent }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {id && (
+        <div className="border-t border-linje pt-4">
+          <Djupdyk id={id} url={k.url} namn={k.namn} befintlig={k.djup} />
+        </div>
       )}
     </article>
   );
@@ -275,7 +282,7 @@ export default function Rapportvy({
         <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">The competitors</h2>
         <div className="flex flex-col gap-4">
           {lasta.map((k) => (
-            <Kort key={k.url} k={k} />
+            <Kort key={k.url} k={k} id={id} />
           ))}
         </div>
       </section>
