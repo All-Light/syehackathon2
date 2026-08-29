@@ -16,10 +16,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function FullSida({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ skriv?: string }>;
 }) {
   const { id } = await params;
+  const { skriv } = await searchParams;
   const sparad = await hamtaRapport(id);
   if (!sparad) notFound();
 
@@ -42,6 +45,10 @@ export default async function FullSida({
           namn={sparad.rapport.egen.namn}
           befintlig={sparad.rapport.full}
           kanKopa={sparad.betald || utveckling}
+          /* Read on the server so it reflects the address this page was
+             requested with. The component clears it from the address as soon as
+             it acts on it, so a reload mid-run arrives here without it. */
+          skrivDirekt={skriv === "1"}
         />
 
         <Kallor rapport={sparad.rapport} />

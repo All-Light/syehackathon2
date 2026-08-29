@@ -88,8 +88,108 @@ export async function hamtaHistorik(orgnr: string): Promise<Bokslutsar[]> {
     .filter((r) => r.omsattningTkr !== null || r.resultatTkr !== null);
 }
 
-function plocka(md: string, url: string, namn: string): Orgdata | null {
-  if (!ombolaget(md, namn)) {
+/** Swedish organisationsnummer carry a Luhn check digit over all ten digits. */
+function luhnOk(siffror: string): boolean {
+  let summa = 0;
+  for (let i = 0; i < siffror.length; i++) {
+    let d = Number(siffror[i]);
+    if (i % 2 === 0) d *= 2;
+    if (d > 9) d -= 9;
+    summa += d;
+  }
+  return summa % 10 === 0;
+}
+
+/**
+ * Ten digits, Luhn-clean, and a third digit of 2 or more.
+ *
+ * The third digit is the group code (5 = aktiebolag, 7 = ekonomisk förening,
+ * 9 = handelsbolag …) and is never 0 or 1 for an organisation — those shapes
+ * are personnummer. An enskild firma trades under its owner's personnummer,
+ * files no annual accounts at all, and putting a private person's number in a
+ * competitor report is not something we are willing to do. So a number in that
+ * shape is deliberately rejected: there is nothing to fetch behind it.
+ *
+ * Validating here rather than at the register turns a bad number into zero
+ * network calls instead of a wasted scrape.
+ */
+export function giltigtOrgnr(rå: string | null | undefined): string | null {
+  if (!rå) return null;
+  const rent = rå.replace(/\D/g, "");
+  if (rent.length !== 10) return null;
+  if (Number(rent[2]) < 2) return null;
+  return luhnOk(rent) ? rent : null;
+}
+
+/** "5564696291" -> "556469-6291", the way every register prints it. */
+export function formateraOrgnr(rent: string): string {
+  return `${rent.slice(0, 6)}-${rent.slice(6)}`;
+}
+
+/**
+ * The org number off the competitor's OWN page.
+ *
+ * Swedish companies are required to publish it, so it is almost always in the
+ * footer or on an "om oss", "kontakt" or terms page — and unlike a brand name
+ * it is exact. Three shapes, most explicit first:
+ *
+ *   1. a VAT number, SE + the ten digits + 01 ("SE556469629101"),
+ *   2. digits introduced by Org.nr / Organisationsnummer / momsreg…,
+ *   3. the hyphenated 556469-6291 form on its own.
+ *
+ * A bare run of ten digits is NOT accepted: phone numbers, article ids and
+ * timestamps all look like that, and a wrong number here would send us to a
+ * stranger's accounts.
+ */
+export function plockaOrgnr(text: string): { orgnr: string; citat: string } | null {
+  if (!text) return null;
+  // Non-breaking spaces and soft hyphens are all over Swedish footers.
+  const t = text.replace(/[\u00a0\u2007\u202f]/g, " ").replace(/[\u00ad]/g, "");
+
+  const monster: RegExp[] = [
+    // The org number is embedded in the Swedish VAT number, between SE and 01.
+    /\bSE\s?(\d{6})\s?-?\s?(\d{4})\s?01\b/gi,
+    /\b(?:org(?:anisations)?\s*\.?\s*(?:nr|nummer)|momsreg\w*|vat[\s.]*(?:nr|no|number)?)\s*[:.\-–]?\s*(?:SE)?\s*(\d{6})\s?-?\s?(\d{4})/gi,
+    /(?<![\d-])(\d{6})-(\d{4})(?![\d-])/g,
+  ];
+
+  for (const re of monster) {
+    const funna = new Map<string, { antal: number; sist: number; citat: string }>();
+
+    for (const m of t.matchAll(re)) {
+      const orgnr = giltigtOrgnr(`${m[1]}${m[2]}`);
+      if (!orgnr) continue;
+      const i = m.index ?? 0;
+      const citat = t
+        .slice(Math.max(0, i - 60), i + m[0].length + 20)
+        .replace(/\s+/g, " ")
+        .trim();
+      const fanns = funna.get(orgnr);
+      funna.set(orgnr, { antal: (fanns?.antal ?? 0) + 1, sist: i, citat });
+    }
+    if (!funna.size) continue;
+
+    // A site can name several companies — Qvitta's product demo lists example
+    // firms in a dropdown. The company's own number is the one repeated on every
+    // page, and when the count ties, the later one: footers sit at the bottom.
+    const [orgnr, vald] = [...funna].sort(
+      (a, b) => b[1].antal - a[1].antal || b[1].sist - a[1].sist,
+    )[0];
+    return { orgnr, citat: vald.citat };
+  }
+  return null;
+}
+
+/**
+ * `kravNamn` is false on the org-number path. There the number itself is the
+ * verification — we asked allabolag for exactly one company — and the register
+ * answers under the registered name, which is routinely not the brand name:
+ * Qvitta files as "H&S Systembydesign AB", Accounted as "Arcim Technology AB",
+ * Fortnox as "Fortnox Aktiebolag". Keeping the name guard on that path would
+ * throw away correct matches for the very reason the org number was needed.
+ */
+function plocka(md: string, url: string, namn: string, kravNamn = true): Orgdata | null {
+  if (kravNamn && !ombolaget(md, namn)) {
     console.warn(`[orgdata] ${namn}: ${url} is about a different company — dropped`);
     return null;
   }
@@ -119,6 +219,46 @@ function plocka(md: string, url: string, namn: string): Orgdata | null {
   };
 }
 
+/** Five filed years give a real growth rate; a single year gives none. */
+async function komplettera(ut: Orgdata): Promise<Orgdata> {
+  if (!ut.orgnr) return ut;
+  ut.historik = await hamtaHistorik(ut.orgnr).catch(() => []);
+  const [nu, forra] = ut.historik;
+  if (nu?.omsattningTkr && forra?.omsattningTkr) {
+    ut.tillvaxtProcent = Math.round(
+      ((nu.omsattningTkr - forra.omsattningTkr) / forra.omsattningTkr) * 100,
+    );
+  }
+  return ut;
+}
+
+/**
+ * The direct route: allabolag redirects /<ten digits> straight to that one
+ * company's page, so a number we read off the competitor's own site skips the
+ * search entirely. No ranking, no similarly named strangers, one scrape.
+ *
+ * Verified live against allabolag.se before this was written — /5564696291
+ * lands on Fortnox Aktiebolag with the same markup plocka() already parses.
+ */
+async function hamtaViaOrgnr(orgnr: string, namn: string): Promise<Orgdata | null> {
+  const sida = await skrapa(`https://www.allabolag.se/${orgnr}`);
+  if (!sida) return null;
+
+  // The number replaces the name guard, so it has to be checked just as hard:
+  // the page we got back must itself carry the number we asked for. A redirect
+  // to a search page or a masked profile fails this and yields null.
+  const pa = sida.markdown.match(/(?:Org\.?nr|Organisationsnummer)\s*(\d{6})-?(\d{4})/);
+  if (!pa || `${pa[1]}${pa[2]}` !== orgnr) {
+    console.warn(`[orgdata] ${namn}: ${orgnr} — the register page does not carry that number, dropped`);
+    return null;
+  }
+
+  const ut = plocka(sida.markdown, sida.url, namn, false);
+  if (!ut) return null;
+  ut.orgnr = formateraOrgnr(orgnr);
+  return komplettera(ut);
+}
+
 /**
  * The moat. Every Swedish AB files public annual accounts, so we can state a
  * competitor's revenue and headcount — which no marketing page reveals and no
@@ -126,8 +266,27 @@ function plocka(md: string, url: string, namn: string): Orgdata | null {
  *
  * Parsed, not prompted: the registers render these figures in a fixed shape,
  * and a regex cannot invent a number that is not on the page.
+ *
+ * `orgnr` is the number found on the competitor's own site. When we have one it
+ * is tried first, because searching the registers for a brand name is the step
+ * that both misses ("Redofy" finds nothing) and mismatches ("Qvitta" finds
+ * Qvittra AB). The name search stays as the fallback for sites that publish no
+ * number.
  */
-export async function hamtaOrgdata(namn: string): Promise<Orgdata | null> {
+export async function hamtaOrgdata(namn: string, orgnr?: string | null): Promise<Orgdata | null> {
+  const rent = giltigtOrgnr(orgnr);
+  if (orgnr && !rent) {
+    console.warn(`[orgdata] ${namn}: "${orgnr}" is not a valid org number — falling back to the name`);
+  }
+  if (rent) {
+    try {
+      const ut = await hamtaViaOrgnr(rent, namn);
+      if (ut) return ut;
+    } catch (e) {
+      console.error(`[orgdata] orgnr ${namn}:`, e instanceof Error ? e.message : e);
+    }
+  }
+
   // Exa can search inside the registers and hand back the page text in one
   // call, which keeps the whole lookup off the Firecrawl rate limit.
   if (harExa()) {
@@ -140,17 +299,7 @@ export async function hamtaOrgdata(namn: string): Promise<Orgdata | null> {
       for (const t of traffar) {
         const ut = t.text ? plocka(t.text, t.url, namn) : null;
         if (!ut) continue;
-        if (ut.orgnr) {
-          ut.historik = await hamtaHistorik(ut.orgnr).catch(() => []);
-          // Five filed years give a real growth rate; a single year gives none.
-          const [nu, forra] = ut.historik;
-          if (nu?.omsattningTkr && forra?.omsattningTkr) {
-            ut.tillvaxtProcent = Math.round(
-              ((nu.omsattningTkr - forra.omsattningTkr) / forra.omsattningTkr) * 100,
-            );
-          }
-        }
-        return ut;
+        return komplettera(ut);
       }
     } catch (e) {
       console.error(`[orgdata] exa ${namn}:`, e instanceof Error ? e.message : e);
@@ -162,7 +311,9 @@ export async function hamtaOrgdata(namn: string): Promise<Orgdata | null> {
     const kandidat = traffar.find((t) => REGISTER_RE.test(t.url));
     if (!kandidat) return null;
     const sida = await skrapa(kandidat.url);
-    return sida ? plocka(sida.markdown, sida.url, namn) : null;
+    const ut = sida ? plocka(sida.markdown, sida.url, namn) : null;
+    // Same completion as the Exa path: one page is a number, five years is the trend.
+    return ut ? komplettera(ut) : null;
   } catch (e) {
     console.error(`[orgdata] ${namn}:`, e instanceof Error ? e.message : e);
     return null;

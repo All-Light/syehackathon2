@@ -14,6 +14,7 @@ import type {
   Tillit,
 } from "../types";
 import { djupdyk } from "./djupdyk";
+import { byggSwot } from "./swot";
 import { arSvensk, sprakInstruktion } from "./sprak";
 
 /**
@@ -68,13 +69,23 @@ const AvsnittSchema = z.object({
 /** "99 kr/mån" and "199 kr per månad" are the same number to a reader. */
 function tolkaPris(pris: string, period: string | null): number | null {
   const text = `${pris} ${period ?? ""}`.toLowerCase();
-  const siffra = text.match(/(\d[\d\s ]*(?:[.,]\d+)?)/);
+  const siffra = pris.match(/(\d[\d\s ]*(?:[.,]\d+)?)/);
   if (!siffra) return null;
   const tal = Number(siffra[1].replace(/[\s ]/g, "").replace(",", "."));
   if (!Number.isFinite(tal) || tal <= 0) return null;
-  // A yearly price is not comparable to a monthly one on the same axis.
-  if (/år|year|annual/.test(text)) return Math.round(tal / 12);
-  if (/mån|month|mnd/.test(text)) return tal;
+
+  // "49 kr/månad (årsvis)" is 49 a month billed yearly, not 49 a year. Month
+  // wins the tie, and the period field is more trustworthy than a parenthetical
+  // in the price string.
+  const manad = /mån|month|mnd|\/mo\b/;
+  const ar = /år|year|annual|\/yr\b/;
+  if (period) {
+    const p = period.toLowerCase();
+    if (manad.test(p)) return tal;
+    if (ar.test(p)) return Math.round(tal / 12);
+  }
+  if (manad.test(text)) return tal;
+  if (ar.test(text)) return Math.round(tal / 12);
   return null;
 }
 
@@ -183,6 +194,11 @@ Market: ${rapport.egen.geografi}
 # Your section
 ${arg.rubrik} — ${arg.uppdrag}
 
+${
+      rapport.egen_djup
+        ? `# ${rapport.egen.namn} — read the same way, from their own pages\n${underlag(rapport.egen_djup)}\n`
+        : ""
+    }
 # Everything we know about the competitors
 ${rapport.konkurrenter.map(underlag).join("\n\n")}
 
@@ -350,7 +366,13 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
     slutsats: topp.slutsats,
     ogonblick: topp.ogonblick.slice(0, 6),
     avsnitt,
-    positioner: positioner(konkurrenter),
+    // The customer's own company is read by the same instrument as every rival
+    // (undersokKonkurrent), so it belongs on the same axes. A map of the market
+    // that omits the reader is missing its anchor.
+    positioner: positioner(
+      rapport.egen_djup ? [rapport.egen_djup, ...konkurrenter] : konkurrenter,
+    ),
+    swot: byggSwot(konkurrenter),
     tillvaxt: konkurrenter
       .filter((k) => (k.orgdata?.historik.length ?? 0) >= 2)
       .map((k) => ({
@@ -364,7 +386,7 @@ Answer with ONLY valid JSON, no prose, no markdown fence:
     metod: `Every price and feature here was read from the competitor's own pages on ${new Date().toLocaleDateString("sv-SE")} and is quoted in the sources. Company figures come from Swedish public filings, which lag the present by up to a year, are not audited by Bolagsverket, and exist only for aktiebolag — a competitor with no figures is not thereby small. Claims are labelled Verified where they rest on a quoted page, Derived where they follow from combining verified facts, and Judgement where a reasonable person could disagree. Revenue by year comes from the accounts each company has filed, five years where five exist; a competitor that files nothing appears in no growth figure, which is a gap in the evidence and not a finding about their size. We do not state a market size: the honest public proxies for it are counts of registered companies, which are not the same thing, and an invented number would undermine everything else here. On the positioning chart, price is the median of what a company publishes — not its cheapest tier, which for a vendor with a low add-on fee would put them below everyone — and breadth is a rank within this set of competitors rather than an absolute score.`,
   };
 
-  yield { typ: "klar", full };
+  yield { typ: "klar", full, konkurrenter };
 }
 
 function paus(): Promise<false> {

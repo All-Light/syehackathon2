@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Svep } from "@/components/Arbetsvy";
 import type {
   Djupdykning,
   DjupHandelse,
@@ -103,14 +104,9 @@ function Tavla({ klara, sekunder }: { klara: Vinkel[]; sekunder: number }) {
           <li key={plats.id} className="flex flex-col gap-3 py-4">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <span className="flex items-center gap-2.5">
-                {klar ? (
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                ) : (
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-linje" />
-                  </span>
-                )}
+                {/* One tick, same as this researcher's tick on the scale above:
+                    standing once they have reported, low while still out. */}
+                <span className={`svep-tand${klar ? " svep-tand-klar" : ""}`} />
                 <span className={klar ? "text-black" : "text-dampad"}>
                   {klar?.rubrik ?? plats.rubrik}
                 </span>
@@ -323,10 +319,7 @@ export default function Djupdyk({
       <section className="flex flex-col gap-8 border-t border-linje pt-10">
         <div className="flex flex-col gap-3">
           <span className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] text-dampad">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber" />
-            </span>
+            <Svep totalt={LAGET.length} klara={vinklar.length} />
             {vinklar.length} of {LAGET.length} angles in
           </span>
           <h2 className="font-serif text-3xl leading-tight text-black sm:text-4xl">

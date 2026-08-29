@@ -34,8 +34,13 @@ export async function POST(req: Request) {
       try {
         for await (const handelse of skrivFullrapport(sparad.rapport)) {
           if (handelse.typ === "klar") {
-            // It costs minutes of research; the share link should carry it.
-            await uppdateraRapport(id, { ...sparad.rapport, full: handelse.full });
+            // Save the deep dives too, not just the report written from them:
+            // they are the expensive half, and the summary page shows them.
+            await uppdateraRapport(id, {
+              ...sparad.rapport,
+              konkurrenter: handelse.konkurrenter,
+              full: handelse.full,
+            });
           }
           skicka(handelse);
         }

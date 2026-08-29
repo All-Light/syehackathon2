@@ -208,3 +208,100 @@ html {
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The sweep. A run is not an unknown wait — it is a known set being read one
+   item at a time: these competitors, these five angles, these arguments. So the
+   working mark is a measuring scale rather than a spinner: a hairline rule with
+   one tick per source, tall and amber once that source has been read, short and
+   faint while it is still out. The count is the information; the travelling
+   head only says the run is still moving, and is deliberately the quietest
+   thing on the screen because the text beside it is what the reader is here for.
+   --------------------------------------------------------------------------- */
+.svep {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex: none;
+  width: 3.5rem;
+  height: 12px;
+  padding-bottom: 1px;
+}
+
+/* The rule is the whole set, drawn even before its size is known. */
+.svep::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: var(--linje);
+}
+
+/* Fixed box, so a tick occupies the same space read or not and nothing on the
+   line shifts when one lands. */
+.svep-tand {
+  position: relative;
+  flex: none;
+  width: 2px;
+  height: 11px;
+}
+
+.svep-tand::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  background: var(--linje);
+  transition:
+    height 450ms ease,
+    background-color 450ms ease;
+}
+
+.svep-tand-klar::after {
+  height: 11px;
+  background: var(--amber);
+}
+
+.svep-huvud {
+  position: absolute;
+  top: -2px;
+  bottom: -1px;
+  left: 0;
+  width: 20px;
+  margin-left: -20px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in oklab, var(--amber) 16%, transparent) 70%,
+    color-mix(in oklab, var(--amber) 62%, transparent)
+  );
+  animation: svep 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* Travel is the track plus the head's own width, so it starts and ends clear
+   of the rule instead of clipping at the edges. */
+@keyframes svep {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  14%,
+  86% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(4.75rem);
+    opacity: 1;
+  }
+}
+
+/* The global reduce rule only shortens the loop, which would strand the head
+   somewhere on the rule as a stray amber smear. Remove it: the ticks carry the
+   progress on their own, and the label beside them carries the elapsed time. */
+@media (prefers-reduced-motion: reduce) {
+  .svep-huvud {
+    display: none;
+  }
+}

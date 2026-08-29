@@ -428,9 +428,13 @@ export default function Rapportvy({
               : "One answer, argued in five parts, with every claim marked by how far it sits from the page it came from. Two to four minutes."}
           </p>
           {/* Its own tab: it is a different document from this one, and a
-              reader who opens it should not lose their place here. */}
+              reader who opens it should not lose their place here. `skriv=1`
+              carries the press across the tab boundary so the destination
+              starts writing on arrival instead of asking a second time; it is
+              left off when a report already exists, since there is nothing to
+              write. */}
           <a
-            href={`/r/${id}/full`}
+            href={`/r/${id}/full${rapport.full ? "" : "?skriv=1"}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 self-start border border-black px-5 py-2.5 text-sm text-black transition-colors hover:bg-black hover:text-papper"

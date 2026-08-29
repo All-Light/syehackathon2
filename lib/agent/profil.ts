@@ -15,8 +15,23 @@ const Schema = z.object({
 
 /** Step 01. Everything downstream is steered by this, so it reads the real site. */
 export async function profileraSjalv(url: string): Promise<Foretag> {
-  const sida = await skrapa(url);
-  if (!sida) throw new Error(`Could not read ${url}. Check the address.`);
+  // This one fetch is the single point of failure for the whole run: everything
+  // downstream is steered by it. Firecrawl's per-minute cap is shared across
+  // every concurrent run on the account, so a burst can lose this page while
+  // the address is perfectly fine — worth waiting out rather than failing.
+  let sida = await skrapa(url);
+  for (let forsok = 1; !sida && forsok <= 2; forsok++) {
+    await new Promise((k) => setTimeout(k, forsok * 8_000));
+    sida = await skrapa(url, { farsk: true });
+  }
+
+  if (!sida) {
+    // Do not tell someone to check an address we never rejected. It parsed, we
+    // simply could not fetch it.
+    throw new Error(
+      `Could not fetch ${url}. The site may be blocking us, or we may be over our own rate limit — worth trying again in a minute.`,
+    );
+  }
 
   const p = `You are reading a company's own website and summarising what they do.
 

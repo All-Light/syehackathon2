@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import Arbetsvy, { type Kandidat } from "@/components/Arbetsvy";
 import Rapportvy from "@/components/Rapportvy";
 import type { Handelse, Rapport } from "@/lib/types";
@@ -31,6 +31,168 @@ function arKorning(h: unknown): h is Korningshandelse {
   return k.typ === "korning" && typeof k.id === "string";
 }
 
+/* ---------------------------------------------------------------------------
+   Previous research. A run costs two minutes and lives at a url nobody wrote
+   down, so the browser remembers the ones it started. Local only: there is no
+   sign-up, so there is nowhere else to put it.
+   --------------------------------------------------------------------------- */
+
+/**
+ * Versioned, so a later change to the row shape can claim a new key and simply
+ * ignore what an old browser left behind instead of having to migrate it.
+ */
+const LAGERNYCKEL = "sweep.tidigare.v1";
+
+/** Enough to get back to last week's runs, few enough to stay a footer. */
+const MAX_TIDIGARE = 8;
+
+/** One finished run, as much of it as is needed to offer it back. */
+type Tidigare = {
+  id: string;
+  /** What was typed into the form. Kept as the row's identity, not for display. */
+  url: string;
+  /** The company the agent read us as. Falls back to the host when unnamed. */
+  namn: string;
+  /** Epoch ms. Rendered as an age, so no formatted date reaches the markup. */
+  tid: number;
+};
+
+/** Everything under the key was written by an older build, so trust nothing. */
+function arTidigare(v: unknown): v is Tidigare {
+  if (typeof v !== "object" || v === null) return false;
+  const t = v as Record<string, unknown>;
+  return (
+    typeof t.id === "string" &&
+    t.id.length > 0 &&
+    typeof t.url === "string" &&
+    typeof t.namn === "string" &&
+    t.namn.length > 0 &&
+    typeof t.tid === "number" &&
+    Number.isFinite(t.tid)
+  );
+}
+
+/**
+ * "YourCompany.com/", "https://www.yourcompany.com" and "yourcompany.com" are
+ * one company to whoever reads this list, so they collapse to one row.
+ */
+function urlnyckel(url: string): string {
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/+$/, "");
+}
+
+/**
+ * Never throws. localStorage is absent on the server, absent in some private
+ * windows, and throws outright where site data is blocked — in every one of
+ * those cases the honest answer is an empty list, not a broken page.
+ */
+function hamtaTidigare(): Tidigare[] {
+  try {
+    const ratt = window.localStorage.getItem(LAGERNYCKEL);
+    if (!ratt) return [];
+    const tolkat: unknown = JSON.parse(ratt);
+    if (!Array.isArray(tolkat)) return [];
+    const sedda = new Set<string>();
+    return tolkat
+      .filter(arTidigare)
+      .sort((a, b) => b.tid - a.tid)
+      .filter((t) => {
+        // An older build may have written duplicates; newest wins.
+        const nyckel = urlnyckel(t.url);
+        if (sedda.has(nyckel)) return false;
+        sedda.add(nyckel);
+        return true;
+      })
+      .slice(0, MAX_TIDIGARE);
+  } catch {
+    return [];
+  }
+}
+
+/* The list is an external store rather than component state, so the page can
+   read it through useSyncExternalStore: that hook takes a separate server
+   snapshot, which is what makes the empty server HTML and the first client
+   paint agree by construction instead of by convention. */
+
+/** One shared empty list, so "nothing stored" is the same value every time. */
+const TOMT: Tidigare[] = [];
+
+/** Snapshots are compared by identity, so parsing on every call would loop. */
+let cachad: Tidigare[] | null = null;
+const lyssnare = new Set<() => void>();
+
+function meddela() {
+  for (const pa of lyssnare) pa();
+}
+
+function prenumerera(pa: () => void): () => void {
+  lyssnare.add(pa);
+  // A run finished in another tab is still this browser's history.
+  const vidLagring = (e: StorageEvent) => {
+    if (e.key !== null && e.key !== LAGERNYCKEL) return;
+    cachad = null;
+    meddela();
+  };
+  window.addEventListener("storage", vidLagring);
+  return () => {
+    lyssnare.delete(pa);
+    window.removeEventListener("storage", vidLagring);
+  };
+}
+
+function ogonblick(): Tidigare[] {
+  if (cachad === null) {
+    const lista = hamtaTidigare();
+    cachad = lista.length > 0 ? lista : TOMT;
+  }
+  return cachad;
+}
+
+/** The server has no localStorage, so empty is the only honest snapshot there. */
+function serverOgonblick(): Tidigare[] {
+  return TOMT;
+}
+
+/**
+ * Never throws. A full quota or a blocked store costs the reader this browser's
+ * list at most, and never the run that was just paid for — the report itself is
+ * already safe on the server at /r/<id>.
+ */
+function sparaTidigare(post: Tidigare) {
+  const nyckel = urlnyckel(post.url);
+  const lista = [post, ...ogonblick().filter((t) => urlnyckel(t.url) !== nyckel)].slice(
+    0,
+    MAX_TIDIGARE,
+  );
+  cachad = lista;
+  meddela();
+  try {
+    window.localStorage.setItem(LAGERNYCKEL, JSON.stringify(lista));
+  } catch {
+    // Intentionally swallowed. See above.
+  }
+}
+
+/**
+ * Coarse on purpose. The row answers "which run was that", not "when exactly",
+ * and a rounded age reads at a glance where a timestamp has to be decoded.
+ */
+function alder(tid: number): string {
+  const minuter = (Date.now() - tid) / 60000;
+  if (minuter < 1) return "just now";
+  if (minuter < 60) return `${Math.floor(minuter)} min ago`;
+  const timmar = minuter / 60;
+  if (timmar < 24) return `${Math.floor(timmar)}h ago`;
+  const dagar = timmar / 24;
+  if (dagar < 7) return `${Math.floor(dagar)}d ago`;
+  if (dagar < 30) return `${Math.floor(dagar / 7)}w ago`;
+  return `${Math.floor(dagar / 30)}mo ago`;
+}
+
 export default function Sida() {
   const [fas, sattFas] = useState<Fas>("start");
   const [url, sattUrl] = useState("");
@@ -40,7 +202,21 @@ export default function Sida() {
   const [rapport, sattRapport] = useState<Rapport | null>(null);
   const [rapportId, sattRapportId] = useState<string | null>(null);
   const [fel, sattFel] = useState<string | null>(null);
+  // Read through the store's server snapshot, which is empty by definition:
+  // localStorage does not exist on the server, so anything read during render
+  // would make the client's first paint contradict the HTML it hydrates.
+  const tidigare = useSyncExternalStore(prenumerera, ogonblick, serverOgonblick);
   const avbryt = useRef<AbortController | null>(null);
+  /**
+   * The run in progress, gathered as its events arrive. A ref, not state: the
+   * stream loop closes over the render that submitted the form, so state read
+   * from inside it would still be what it was before the first event landed.
+   */
+  const korning = useRef<{ id: string | null; url: string; namn: string | null }>({
+    id: null,
+    url: "",
+    namn: null,
+  });
 
   async function starta(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +227,7 @@ export default function Sida() {
     sattRader([]);
     sattKandidater([]);
     sattForetag(null);
+    korning.current = { id: null, url: url.trim(), namn: null };
     // A second analysis from a page still showing /r/<previous> would otherwise
     // sit under an address that describes someone else's run.
     window.history.replaceState(null, "", "/");
@@ -87,6 +264,7 @@ export default function Sida() {
           const h: unknown = JSON.parse(rad.slice(6));
           if (arKorning(h)) {
             sattRapportId(h.id);
+            korning.current.id = h.id;
             // replaceState, not the router: a navigation unmounts this
             // component and aborts the fetch that is producing the run.
             window.history.replaceState(null, "", `/r/${h.id}`);
@@ -109,6 +287,7 @@ export default function Sida() {
         break;
       case "profil":
         sattForetag(h.egen.namn);
+        korning.current.namn = h.egen.namn;
         break;
       case "kandidat":
         sattKandidater((k) =>
@@ -120,11 +299,25 @@ export default function Sida() {
           k.map((x) => (x.url === h.konkurrent.url ? { ...x, klar: true } : x)),
         );
         break;
-      case "klar":
+      case "klar": {
         sattRapport(h.rapport);
         sattRapportId(h.id);
         sattFas("klar");
+        // Only a finished run is worth offering back, and only one with an id:
+        // without it there is no /r/<id> for the row to lead anywhere.
+        const id = h.id ?? korning.current.id;
+        if (id) {
+          sparaTidigare({
+            id,
+            url: korning.current.url,
+            // An unnamed run still deserves a row; the host is what the person
+            // typed, so they will recognise it.
+            namn: korning.current.namn?.trim() || urlnyckel(korning.current.url) || "Untitled",
+            tid: Date.now(),
+          });
+        }
         break;
+      }
       case "fel":
         sattFel(h.text);
         sattFas("start");
@@ -216,6 +409,38 @@ export default function Sida() {
           {fel && <p className="text-sm text-rod">{fel}</p>}
           <p className="text-sm text-dampad">Takes about two minutes. No sign-up.</p>
         </form>
+
+        {/* Nothing at all until there is something: a "no previous research"
+            panel on a first visit is a promise the page has not kept yet, and
+            it would sit between the reader and the only control that matters.
+            Empty is also what the server renders, so hydration has nothing to
+            disagree about. */}
+        {tidigare.length > 0 && (
+          <section className="flex flex-col gap-3 border-t border-linje pt-6">
+            <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+              Previous research
+            </h2>
+            <ul className="flex flex-col">
+              {tidigare.map((t) => (
+                <li key={t.id}>
+                  <a
+                    href={`/r/${t.id}`}
+                    className="group flex items-baseline justify-between gap-6 py-1.5 text-sm"
+                  >
+                    {/* The name carries the row's weight, the age recedes: the
+                        thing you press should be the legible one. */}
+                    <span className="truncate text-black transition-colors group-hover:text-amber">
+                      {t.namn}
+                    </span>
+                    {/* Tabular, so the ages line up as a column rather than
+                        wobbling against the right edge. */}
+                    <span className="siffror shrink-0 text-dampad">{alder(t.tid)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </main>
   );

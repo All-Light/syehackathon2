@@ -1,6 +1,7 @@
 import { parallellt } from "../firecrawl";
 import type { Handelse, Konkurrent, Namngiven } from "../types";
 import { profileraSjalv } from "./profil";
+import { undersokEgen } from "./sjalv";
 import { syntetisera } from "./syntes";
 import { undersokKonkurrent } from "./undersok";
 import { upptackKonkurrenter, type Kandidat } from "./upptack";
@@ -34,6 +35,24 @@ export async function* kor(indata: Indata): AsyncGenerator<Handelse> {
   yield { typ: "steg", steg: "profil", text: "Reading your website" };
   const egen = await tid("profil", () => profileraSjalv(indata.url));
   yield { typ: "profil", egen };
+
+  // Read our own site the way we read a competitor's. It depends on nothing but
+  // the profile, so it starts here and runs alongside discovery and the
+  // researchers instead of adding its own half-minute to the wall clock. It is
+  // deliberately not awaited until just before the synthesis.
+  yield { typ: "steg", steg: "egen", text: `Reading ${egen.namn} the way we read a competitor` };
+  const egetArbete = tid("egen", () => undersokEgen(egen, logg("egen")))
+    .then((ut) => {
+      kö.push({
+        typ: "steg",
+        steg: "egen",
+        text: ut
+          ? `Read ${ut.priser.length} published price${ut.priser.length === 1 ? "" : "s"} on ${egen.namn}`
+          : `Could not read ${egen.namn} in depth — the comparison continues without it`,
+      });
+      return ut;
+    })
+    .catch(() => null);
 
   yield {
     typ: "steg",
@@ -110,9 +129,29 @@ export async function* kor(indata: Indata): AsyncGenerator<Handelse> {
     return;
   }
 
+  // By now our own research has had the whole discovery-and-research run to
+  // finish in, so this almost always resolves at once. Cap the wait anyway: the
+  // report must not be held hostage by the one part of it that is a bonus.
+  const egenDjup = await forst(egetArbete, 20_000);
+  while (kö.length) yield kö.shift()!;
+
   yield { typ: "steg", steg: "syntes", text: "Comparing and drawing conclusions" };
   const rapport = await tid("syntes", () => syntetisera(egen, klara, ovriga));
-  yield { typ: "klar", rapport, id: null };
+  yield { typ: "klar", rapport: { ...rapport, egen_djup: egenDjup }, id: null };
+}
+
+/** Whatever the work has produced by `ms`, or null. The timer is cleared so a
+ *  finished run does not sit waiting on it. */
+async function forst<T>(arbete: Promise<T | null>, ms: number): Promise<T | null> {
+  let klocka: ReturnType<typeof setTimeout> | undefined;
+  const grans = new Promise<null>((k) => {
+    klocka = setTimeout(() => k(null), ms);
+  });
+  try {
+    return await Promise.race([arbete, grans]);
+  } finally {
+    clearTimeout(klocka);
+  }
 }
 
 function tick(): Promise<false> {

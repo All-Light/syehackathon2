@@ -5,6 +5,30 @@ import { useEffect, useRef } from "react";
 export type Kandidat = { namn: string; url: string; klar: boolean };
 
 /**
+ * The working mark, shared by every view that runs one of these jobs — a scale
+ * of the set being read, one tick per source, filled as each one comes back.
+ *
+ * It lives here because this is the view that owns the wait; the deep dive and
+ * the full report import it so the three screens speak with one mark rather
+ * than three. `klara` is a count, not a set: the scale says how much of the
+ * work is in, and the chips or rows underneath say which.
+ */
+export function Svep({ totalt, klara }: { totalt: number; klara: number }) {
+  return (
+    // Decorative: the label beside it already states the same progress in words.
+    <span className="svep" aria-hidden="true">
+      {Array.from({ length: totalt }, (_, i) => (
+        <span
+          key={i}
+          className={`svep-tand${i < klara ? " svep-tand-klar" : ""}`}
+        />
+      ))}
+      <span className="svep-huvud" />
+    </span>
+  );
+}
+
+/**
  * The wait is the proof. Every line here is a decision the agent actually made,
  * so the ninety seconds read as work rather than as a spinner.
  */
@@ -27,10 +51,10 @@ export default function Arbetsvy({
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center gap-10 px-6 py-16">
       <div className="flex flex-col gap-3">
         <span className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] text-dampad">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber" />
-          </span>
+          <Svep
+            totalt={kandidater.length}
+            klara={kandidater.filter((k) => k.klar).length}
+          />
           Working
         </span>
         <h1 className="font-serif text-4xl leading-tight text-black sm:text-5xl">
@@ -56,9 +80,9 @@ export default function Arbetsvy({
                   : "border-linje/70 bg-transparent text-dampad"
               }`}
             >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${k.klar ? "bg-amber" : "bg-linje"}`}
-              />
+              {/* Same tick as on the scale above, so a chip and its mark on the
+                  rule are recognisably the same thing. */}
+              <span className={`svep-tand${k.klar ? " svep-tand-klar" : ""}`} />
               {k.namn}
             </li>
           ))}

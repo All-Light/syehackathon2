@@ -122,6 +122,11 @@ export type Rapport = {
   konkurrenter: Konkurrent[];
   /** Named, ranked, not read. The user can promote any of these. */
   ovriga: Namngiven[];
+  /**
+   * The customer's own company, read the same way a competitor is. Without it
+   * every comparison is one-sided and the positioning map has no anchor.
+   */
+  egen_djup?: Konkurrent | null;
   hot: Insikt[];
   luckor: Insikt[];
   atgarder: string[];
@@ -180,16 +185,45 @@ export type Fullrapport = {
   positioner: Position[];
   /** Filed revenue over time, per competitor that files. Newest first. */
   tillvaxt: { konkurrent: string; serie: Bokslutsar[] }[];
+  swot: Swot[];
   /** Why these competitors and not others — so the selection is checkable. */
   urval: string;
   metod: string;
+};
+
+/**
+ * One quadrant. `tomtSkal` carries why a quadrant is empty, because a stated
+ * gap is information and a filled-in guess is not.
+ */
+export type SwotRuta = {
+  punkter: { text: string; kalla: Kalla | null }[];
+  tomtSkal: string | null;
+};
+
+/**
+ * A SWOT per competitor, consolidated in code from what the researchers already
+ * found — never free-written. Strengths and weaknesses are about them;
+ * opportunities and threats are stated from the reader's side, which is the
+ * only reading of the four boxes that is coherent.
+ */
+export type Swot = {
+  konkurrent: string;
+  styrkor: SwotRuta;
+  svagheter: SwotRuta;
+  mojligheter: SwotRuta;
+  hot: SwotRuta;
 };
 
 /** Streamed while the full report is written. */
 export type FullHandelse =
   | { typ: "steg"; text: string }
   | { typ: "avsnitt"; avsnitt: Avsnitt }
-  | { typ: "klar"; full: Fullrapport }
+  /**
+   * `konkurrenter` carries back the deep dives run along the way. Without it
+   * the research is discarded the moment the report is saved, and the next run
+   * pays for all of it again.
+   */
+  | { typ: "klar"; full: Fullrapport; konkurrenter: Konkurrent[] }
   | { typ: "fel"; text: string };
 
 /** Streamed while the deep-dive researchers work. */

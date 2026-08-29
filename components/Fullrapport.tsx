@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Swotvy from "@/components/Swot";
+import { Svep } from "@/components/Arbetsvy";
 // Aliased because the component below owns the name `Fullrapport` in this module.
 import type {
   Avsnitt,
@@ -898,6 +900,8 @@ function Rapport({ full }: { full: Fulldata }) {
           </h3>
           {/* Reports saved before this exhibit existed carry no `tillvaxt` at all. */}
           <Tillvaxt tillvaxt={full.tillvaxt ?? []} />
+
+          <Swotvy swot={full.swot} />
         </section>
       )}
 
@@ -930,19 +934,30 @@ export default function Fullrapport({
   namn,
   befintlig,
   kanKopa,
+  skrivDirekt = false,
 }: {
   id: string;
   namn: string;
   befintlig?: Fulldata | null;
   kanKopa: boolean;
+  /** The visitor arrived here in order to write it. See the effect below. */
+  skrivDirekt?: boolean;
 }) {
-  const [arbetar, sattArbetar] = useState(false);
+  /**
+   * The one case where the run is settled before the first paint: the reader
+   * pressed "Write the full report" in the other tab, so this tab must never
+   * show them that button again, not even for the moment between the server's
+   * HTML and hydration. The effect below does the actual starting.
+   */
+  const skrivPaEnGang = skrivDirekt && !befintlig && kanKopa;
+  const [arbetar, sattArbetar] = useState(skrivPaEnGang);
   const [rader, sattRader] = useState<string[]>([]);
   const [avsnitt, sattAvsnitt] = useState<Avsnitt[]>([]);
   const [full, sattFull] = useState<Fulldata | null>(null);
   const [fel, sattFel] = useState<string | null>(null);
   const [sekunder, sattSekunder] = useState(0);
   const avbryt = useRef<AbortController | null>(null);
+  const startad = useRef(false);
 
   // A stored report is the same thing a run would produce, so it wins outright.
   const visad = full ?? befintlig ?? null;
@@ -976,8 +991,10 @@ export default function Fullrapport({
     }
   }
 
-  async function starta() {
-    if (arbetar) return;
+  async function starta(automatiskt = false) {
+    // An automatic run is already shown as working, so its own flag is not a
+    // second press to be swallowed here.
+    if (arbetar && !automatiskt) return;
     sattArbetar(true);
     sattFel(null);
     sattRader([]);
@@ -1024,6 +1041,39 @@ export default function Fullrapport({
     }
   }
 
+  /**
+   * Arriving to write it.
+   *
+   * The intent lives in the address — `?skriv=1`, set on the link that opened
+   * this tab — rather than in a session or a header, because the address is the
+   * only thing a new tab carries with it, and because it keeps the two cases
+   * apart that must not be confused: a reader who pressed "Write the full
+   * report" meant to spend the two to four minutes, and someone opening a
+   * bookmark or a link a colleague sent did not. The second must never be
+   * charged for a job they did not ask for, so absent the parameter we show the
+   * button and wait.
+   *
+   * The parameter is consumed the moment it is honoured: the run starts and the
+   * address is rewritten back to the bare path. That is what makes a reload mid
+   * run safe — the reloaded page no longer carries the intent, so it lands on
+   * the button rather than starting a second run behind the first. The ref
+   * guards the same thing within one mount, where React may run this twice.
+   */
+  useEffect(() => {
+    // `skrivPaEnGang` already excludes a stored report and an unpaid one, so
+    // neither can be made to spend a run from the address bar.
+    if (!skrivPaEnGang || startad.current) return;
+    startad.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    // Off the commit: `starta` sets state on its first line, and doing that
+    // inside the effect body would re-render before this one has landed.
+    void Promise.resolve().then(() => starta(true));
+    // `starta` is left out of the deps on purpose: it is redefined every
+    // render but closes over nothing that changes here — the page is keyed on
+    // the report id — and listing it would re-run this effect forever.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skrivPaEnGang]);
+
   if (visad && !arbetar) return <Rapport full={visad} />;
 
   // The three arguments announce themselves as they start and finish, so the
@@ -1046,10 +1096,10 @@ export default function Fullrapport({
       <section className="ej-tryck flex flex-col gap-10 border-t border-linje pt-12">
         <div className="flex flex-col gap-3">
           <span className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] text-dampad">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber" />
-            </span>
+            <Svep
+              totalt={vinklar.length}
+              klara={vinklar.filter((v) => v.klar).length}
+            />
             {avsnitt.length === 0
               ? "Reading the evidence again"
               : `${avsnitt.length} ${avsnitt.length === 1 ? "argument" : "arguments"} written`}
@@ -1076,7 +1126,9 @@ export default function Fullrapport({
                     : "border-linje/70 bg-transparent text-dampad"
                 }`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${v.klar ? "bg-amber" : "bg-linje"}`} />
+                {/* Same tick as on the scale above: an argument on the chip and
+                    its mark on the rule are the same object. */}
+                <span className={`svep-tand${v.klar ? " svep-tand-klar" : ""}`} />
                 {v.etikett}
               </li>
             ))}
@@ -1130,7 +1182,7 @@ export default function Fullrapport({
       </p>
       <button
         type="button"
-        onClick={starta}
+        onClick={() => starta()}
         className="mt-2 self-start border border-black px-5 py-2.5 text-sm text-black transition-colors hover:bg-black hover:text-papper"
       >
         Write the full report

@@ -4,7 +4,7 @@ import { karta, parallellt, skrapa, type Lank, type Sida } from "../firecrawl";
 import { struktur } from "../llm";
 import type { BevakadSida, Konkurrent, Prisniva, SidTyp } from "../types";
 import type { Kandidat } from "./upptack";
-import { hamtaOrgdata } from "./orgdata";
+import { hamtaOrgdata, plockaOrgnr } from "./orgdata";
 import { kortaCitat } from "../citat";
 import { sprakInstruktion } from "./sprak";
 
@@ -198,6 +198,101 @@ export function bevakad(l: HamtadSida): BevakadSida {
   };
 }
 
+/** The pages a Swedish company puts its org number on when the footer does not,
+ *  best first — only the first three are read, so the order matters. */
+const JURIDISK: RegExp[] = [
+  /\/(kontakt|contact)/i,
+  /\/(om-oss|about|company|foretaget|företaget)/i,
+  /\/(villkor|anvandarvillkor|användarvillkor|terms|legal|impressum)/i,
+  /\/(integritet\w*|privacy|dataskydd|gdpr)/i,
+];
+
+/** Tags out, entities in, so a footer's "Org.nr&nbsp;556469-6291" reads as text. */
+function textAvHtml(html: string): string {
+  return html
+    .replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ");
+}
+
+/** A plain GET. No Firecrawl, so no credit and no rate-limit slot — which is
+ *  the whole reason this is tried before anything else. */
+async function raSida(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, {
+      headers: {
+        // Some Swedish sites hand a bare fetch a consent wall instead of a page.
+        "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept-Language": "sv-SE,sv;q=0.9,en;q=0.8",
+      },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!r.ok) return null;
+    return textAvHtml(await r.text());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The org number, cheapest source first.
+ *
+ * A Swedish company must publish it, and unlike a brand name it is exact:
+ * "Redofy" matches three unrelated registrations, 559538-6219 matches exactly
+ * one company. So it is worth looking for — but not worth Firecrawl credit,
+ * which is why neither step here spends any:
+ *
+ *   1. the markdown we already scraped. Free, but usually a miss: those scrapes
+ *      run with onlyMainContent, which strips the footer the number lives in.
+ *   2. the raw HTML of the start page and up to three legal/contact pages, over
+ *      a plain GET. Also free — no credit, no rate-limit slot — and this is the
+ *      step that lands, because the footer is in the served HTML of any
+ *      server-rendered site.
+ *
+ * A third step was tried and dropped: one Firecrawl scrape of the best legal
+ * page, to reach footers that are only rendered in JavaScript. Measured over
+ * fortnox.se, enkelbok.se, redofy.se, qvitta.se and accounted.se it found not
+ * one number the free steps had missed, while costing a request for every
+ * competitor whose site publishes none. Those fall back to the name search,
+ * exactly as they did before.
+ */
+async function hittaOrgnr(
+  kandidat: Kandidat,
+  levande: HamtadSida[],
+  lankar: Lank[],
+  loggning?: (text: string) => void,
+): Promise<string | null> {
+  const rapportera = (t: { orgnr: string; citat: string }, kalla: string) => {
+    loggning?.(`Found org number ${t.orgnr} for ${kandidat.namn}`);
+    console.log(`[orgnr] ${kandidat.namn}: ${t.orgnr} from ${kalla} — "${t.citat}"`);
+    return t.orgnr;
+  };
+
+  const redan = plockaOrgnr(levande.map((l) => l.sida.markdown).join("\n"));
+  if (redan) return rapportera(redan, "the pages already scraped");
+
+  const juridiska = lankar
+    .map((l) => ({ url: l.url, rang: JURIDISK.findIndex((re) => re.test(l.url)) }))
+    .filter((l) => l.rang >= 0)
+    .sort((a, b) => a.rang - b.rang)
+    .map((l) => l.url)
+    .slice(0, 3);
+  const gratis = [kandidat.url, ...juridiska];
+
+  const rader = await parallellt(gratis, 3, raSida);
+  for (let i = 0; i < rader.length; i++) {
+    const t = rader[i] ? plockaOrgnr(rader[i]!) : null;
+    if (t) return rapportera(t, gratis[i]);
+  }
+
+  // No number published where we can read it. hamtaOrgdata falls back to the
+  // name search, guard and all.
+  return null;
+}
+
 /** Step 03. The agent picks which pages are worth the scrape, then reads them. */
 export async function undersokKonkurrent(
   kandidat: Kandidat,
@@ -232,7 +327,13 @@ export async function undersokKonkurrent(
 
   const [detaljer, orgdata] = await Promise.all([
     bearbeta(kandidat.namn, kandidat.url, levande, svensk),
-    svensk ? hamtaOrgdata(kandidat.namn) : Promise.resolve(null),
+    // Look the number up first and the register second. hamtaOrgdata falls back
+    // to the old name search on its own when the site publishes no number.
+    svensk
+      ? hittaOrgnr(kandidat, levande, lankar, loggning).then((orgnr) =>
+          hamtaOrgdata(kandidat.namn, orgnr),
+        )
+      : Promise.resolve(null),
   ]);
 
   return {
