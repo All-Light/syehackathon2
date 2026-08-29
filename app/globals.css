@@ -19,6 +19,95 @@
      single-accent discipline. */
   --du: #2f6b63;
   --du-ljus: #3f8f83;
+
+  /* -------------------------------------------------------------------------
+     The console vocabulary, adopted from the night-console system next door.
+     Both worlds fill these in, so a component may only ever name the role —
+     card, elevated, hairline, halo — and never a colour. The paper case keeps
+     the flat surface we already had: a card is the ground with a hairline
+     round it, because paper has no light to be raised into.
+     ------------------------------------------------------------------------- */
+  --kort: var(--papper);
+  --upphojd: var(--papper-djup);
+  --upphojd-hov: var(--papper-djup);
+  --harlinje: var(--linje);
+  --harlinje-stark: #cfc6b7;
+  /* Body copy, one step down from the ink a heading is set in. */
+  --kropp: var(--black);
+  /* Quieter than --dampad: tick labels, rules, things you read past. */
+  --ask: #8d8577;
+  /* What a mark is outlined in so it lifts off the grid. The ground it sits
+     on — white on paper, the card itself at night. Never white at night. */
+  --halo: var(--papper);
+  /* What the one washed band is painted over. Paper stacks downward from the
+     ground — a band is the deeper tone — while the console stacks upward, so
+     there the band is the canvas and the cards inside it are what is raised. */
+  --glod-grund: var(--papper-djup);
+  /* The semantic palette. Their system spends real hue on meaning — severity,
+     rising and falling, the kind of page that moved — and on the dashboard
+     that beats our form-not-hue rule, because a change feed with no colour is
+     a list you have to read twice. Paper keeps darker mixes of the same hues
+     so the meaning survives the switch. */
+  --amber-tryckt: var(--black);
+  --hog: var(--rod);
+  --gron: #2f6b46;
+  --bla: #2f5aa8;
+  --gul: #866411;
+  --orange: var(--amber);
+}
+
+/* ---------------------------------------------------------------------------
+   The night console. Every colour of the second world lives here and nowhere
+   else, so `data-tema` on <html> is the whole switch.
+
+   Screen only, deliberately. The report prints to sixteen pages of A4 and the
+   print block at the foot of this file forces white ground and black ink on
+   html and body — but not on the hundred elements between them, which read
+   these variables. Scoping the night world to the screen means paper never
+   sees it and that block never has to know this theme exists.
+   --------------------------------------------------------------------------- */
+@media screen {
+  [data-tema="natt"] {
+    --papper: #141519;
+    --papper-djup: #20212a;
+    --kort: #1a1b22;
+    --upphojd: #20212a;
+    --upphojd-hov: #262731;
+    /* Separation by hairline, never by shadow. 6% for a card edge, 12% where
+       a border has to be found rather than felt. */
+    --harlinje: rgba(255, 255, 255, 0.06);
+    --harlinje-stark: rgba(255, 255, 255, 0.12);
+    /* --linje is the product's gridline and table rule, and it has more work
+       to do than a card edge: a 6% hairline is 1.18:1 on the card and simply
+       is not there. 14% reads at 1.54:1 — quiet, but a grid. */
+    --linje: rgba(255, 255, 255, 0.14);
+    --black: #f4f5f9;
+    --kropp: rgba(244, 245, 249, 0.88);
+    --dampad: #969baa;
+    --ask: #7c8291;
+    --halo: #1a1b22;
+    --glod-grund: #141519;
+    /* The accent the owner already demoed, promoted. It carries the role the
+       reference gives its lavender — primary action, focus, selection, the
+       mark on a chart — without borrowing the hue. 8.46:1 on the canvas. */
+    --amber: var(--amber-ljus);
+    --amber-tryckt: #f2b45c;
+    --rod: #ff5c5c;
+    --hog: #ff5c5c;
+    --gron: #4ade80;
+    --bla: #7aa5ff;
+    --gul: #fcd34d;
+    --orange: #ff9950;
+    /* #2f6b63 is 2.96:1 on this ground — under the 3:1 floor for a graphical
+       mark, before we even ask it to carry a company name in 13px type. The
+       night variant is their tint-ramp teal walked one step towards green,
+       because the chart's own caption calls this the green line and that has
+       to stay true in both worlds. 10.12:1 on the canvas, 9.51:1 on a card,
+       and far enough round the wheel from amber that "which line is mine"
+       still answers itself at a glance. */
+    --du: #4fd6b8;
+    --du-ljus: #7ce3cd;
+  }
 }
 
 @theme inline {
@@ -36,8 +125,27 @@
   --color-natt-dampad: var(--natt-dampad);
   --color-du: var(--du);
   --color-du-ljus: var(--du-ljus);
+  --color-kort: var(--kort);
+  --color-upphojd: var(--upphojd);
+  --color-upphojd-hov: var(--upphojd-hov);
+  --color-harlinje: var(--harlinje);
+  --color-harlinje-stark: var(--harlinje-stark);
+  --color-kropp: var(--kropp);
+  --color-ask: var(--ask);
+  --color-halo: var(--halo);
+  --color-amber-tryckt: var(--amber-tryckt);
+  --color-hog: var(--hog);
+  --color-gron: var(--gron);
+  --color-bla: var(--bla);
+  --color-gul: var(--gul);
+  --color-orange: var(--orange);
   --font-serif: var(--font-display);
   --font-sans: var(--font-ui);
+  /* The console's two faces: a tight grotesk for display, a mono for every
+     number. Loaded globally, spent only on the dashboard — the report keeps
+     its serif. */
+  --font-tat: var(--font-tight);
+  --font-mono: var(--font-siffra);
 }
 
 html {
@@ -80,6 +188,26 @@ html {
 /* Numbers that change in place must not reflow their neighbours. */
 .siffror {
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   The console faces, from their DESIGN.md: one grotesk in a tight cut for
+   display, one mono for every timestamp, count, index and diff. Both are
+   classes rather than utilities because they always travel as a pair of
+   properties — a display heading with default tracking is not the face.
+   --------------------------------------------------------------------------- */
+.rubrik {
+  font-family: var(--font-tight), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--black);
+}
+
+.data {
+  font-family: var(--font-siffra), ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -347,5 +475,69 @@ html {
   .drag {
     animation: none !important;
     stroke-dashoffset: 0 !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The console surface. Their system separates by hairline and never by shadow,
+   so a card is one border over one ground and the only thing that ever changes
+   is which ground. 16px radius, 20px padding — their card spec exactly.
+   --------------------------------------------------------------------------- */
+.konsolkort {
+  background: var(--kort);
+  border: 1px solid var(--harlinje);
+  border-radius: 16px;
+}
+
+/* One wash per view and never two: a low radial of the accent anchored at the
+   top of the hero, which is how their world admits light without turning a
+   surface into a gradient. On paper it is the deep paper tone, the same
+   gesture in a world with no light to spill. */
+.glod {
+  background:
+    radial-gradient(
+      120% 320px at 50% 0%,
+      color-mix(in oklab, var(--amber) 9%, transparent),
+      transparent 72%
+    ),
+    var(--glod-grund);
+}
+
+/* Pending work, their sweepline: a band of light crossing the control that is
+   busy. It says the run is still moving; the label beside it says what runs. */
+.sveplinje {
+  position: relative;
+  overflow: hidden;
+}
+
+.sveplinje::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--amber) 22%, transparent),
+    transparent
+  );
+  animation: sveplinje 1.5s linear infinite;
+}
+
+@keyframes sveplinje {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+/* The global rule only shortens the loop, which would park the band somewhere
+   across the button as a stray smear. The gerund on the label already says the
+   work is running, so drop the band outright. */
+@media (prefers-reduced-motion: reduce) {
+  .sveplinje::after {
+    display: none;
   }
 }

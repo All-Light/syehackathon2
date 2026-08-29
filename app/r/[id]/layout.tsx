@@ -9,6 +9,11 @@ import Flikar from "./Flikar";
  * document: the summary and the full report both print, the full report with
  * its own cover sheet, and a tab you cannot link to is a tab you cannot send
  * to your accountant.
+ *
+ * Dressed as the console's topbar: 64px, sticky, one hairline under it, the
+ * report's name in the display face on the left and the tab row right. It is
+ * the only chrome the dashboard has, so it stays on screen while the page
+ * scrolls — a console you have to scroll back up to navigate is a document.
  */
 export default async function Rapportlayout({
   children,
@@ -25,11 +30,11 @@ export default async function Rapportlayout({
 
   return (
     <>
-      <div className="ej-tryck border-b border-linje bg-papper">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-6 py-4">
+      <div className="ej-tryck sticky top-0 z-40 border-b border-harlinje bg-papper">
+        <div className="mx-auto flex w-full max-w-[880px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:min-h-16 sm:px-6 sm:py-0">
           <Link
             href={`/r/${id}`}
-            className="font-serif text-xl text-black underline-offset-4 hover:text-amber"
+            className="rubrik text-[20px] text-black transition-colors hover:text-amber"
           >
             {sparad.namn}
           </Link>
