@@ -1,0 +1,160 @@
+"use client";
+
+import { useRef, useState } from "react";
+import Arbetsvy, { type Kandidat } from "@/components/Arbetsvy";
+import Rapportvy from "@/components/Rapportvy";
+import type { Handelse, Rapport } from "@/lib/types";
+
+type Fas = "start" | "arbetar" | "klar";
+
+export default function Sida() {
+  const [fas, sattFas] = useState<Fas>("start");
+  const [url, sattUrl] = useState("");
+  const [rader, sattRader] = useState<string[]>([]);
+  const [kandidater, sattKandidater] = useState<Kandidat[]>([]);
+  const [foretag, sattForetag] = useState<string | null>(null);
+  const [rapport, sattRapport] = useState<Rapport | null>(null);
+  const [rapportId, sattRapportId] = useState<string | null>(null);
+  const [fel, sattFel] = useState<string | null>(null);
+  const avbryt = useRef<AbortController | null>(null);
+
+  async function starta(e: React.FormEvent) {
+    e.preventDefault();
+    if (!url.trim()) return;
+
+    sattFas("arbetar");
+    sattFel(null);
+    sattRader([]);
+    sattKandidater([]);
+    sattForetag(null);
+
+    avbryt.current?.abort();
+    const styr = new AbortController();
+    avbryt.current = styr;
+
+    try {
+      const svar = await fetch("/api/analys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+        signal: styr.signal,
+      });
+
+      if (!svar.ok || !svar.body) throw new Error(await svar.text());
+
+      const lasare = svar.body.getReader();
+      const avkodare = new TextDecoder();
+      let buffert = "";
+
+      for (;;) {
+        const { done, value } = await lasare.read();
+        if (done) break;
+        buffert += avkodare.decode(value, { stream: true });
+
+        const bitar = buffert.split("\n\n");
+        buffert = bitar.pop() ?? "";
+
+        for (const bit of bitar) {
+          const rad = bit.trim();
+          if (!rad.startsWith("data: ")) continue;
+          hantera(JSON.parse(rad.slice(6)) as Handelse);
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      sattFel(e instanceof Error ? e.message : "Något gick fel.");
+      sattFas("start");
+    }
+  }
+
+  function hantera(h: Handelse) {
+    switch (h.typ) {
+      case "steg":
+        sattRader((r) => [...r, h.text]);
+        break;
+      case "profil":
+        sattForetag(h.egen.namn);
+        break;
+      case "kandidat":
+        sattKandidater((k) =>
+          k.some((x) => x.url === h.url) ? k : [...k, { namn: h.namn, url: h.url, klar: false }],
+        );
+        break;
+      case "konkurrent":
+        sattKandidater((k) =>
+          k.map((x) => (x.url === h.konkurrent.url ? { ...x, klar: true } : x)),
+        );
+        break;
+      case "klar":
+        sattRapport(h.rapport);
+        sattRapportId(h.id);
+        sattFas("klar");
+        break;
+      case "fel":
+        sattFel(h.text);
+        sattFas("start");
+        break;
+    }
+  }
+
+  if (fas === "klar" && rapport) {
+    return (
+      <main className="min-h-dvh bg-papper">
+        <Rapportvy rapport={rapport} id={rapportId} />
+      </main>
+    );
+  }
+
+  if (fas === "arbetar") {
+    return (
+      <main className="min-h-dvh bg-papper">
+        <Arbetsvy rader={rader} kandidater={kandidater} foretag={foretag} />
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-dvh items-center bg-papper">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-6 py-16">
+        <div className="flex flex-col gap-5">
+          <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">Koll</span>
+          <h1 className="font-serif text-5xl leading-[1.08] text-black sm:text-6xl">
+            Vet vad dina konkurrenter tar betalt.
+          </h1>
+          <p className="max-w-lg text-lg leading-relaxed text-dampad">
+            Klistra in din webbplats. Agenten letar reda på vilka du faktiskt konkurrerar
+            med — även de du inte känner till — läser deras sidor och säger vad du ska
+            göra åt saken.
+          </p>
+        </div>
+
+        <form onSubmit={starta} className="flex flex-col gap-3">
+          <label htmlFor="url" className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+            Din webbplats
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              id="url"
+              type="text"
+              inputMode="url"
+              autoComplete="url"
+              value={url}
+              onChange={(e) => sattUrl(e.target.value)}
+              placeholder="dittforetag.se"
+              className="flex-1 border border-linje bg-transparent px-4 py-3 text-black placeholder:text-dampad/60 focus:border-amber focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-black px-6 py-3 text-papper transition-colors hover:bg-amber disabled:opacity-40"
+              disabled={!url.trim()}
+            >
+              Analysera
+            </button>
+          </div>
+          {fel && <p className="text-sm text-rod">{fel}</p>}
+          <p className="text-sm text-dampad">Tar ungefär två minuter. Ingen inloggning.</p>
+        </form>
+      </div>
+    </main>
+  );
+}

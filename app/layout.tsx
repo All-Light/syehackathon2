@@ -18,9 +18,9 @@ const ui = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Lugn — träna på svåra samtal",
+  title: "Koll — ha koll på dina konkurrenter",
   description:
-    "Träna på arga, förvirrade och hotfulla kunder med rösten. För butik, restaurang och service.",
+    "Klistra in din webbplats. Nittio sekunder senare vet du vad dina konkurrenter tar betalt, vad de lovar och var de är svaga.",
 };
 
 export const viewport: Viewport = {
