@@ -15,7 +15,7 @@ export async function hamtaForandringar(
 
   const { data, error } = await klient
     .from("koll_forandringar")
-    .select("konkurrent, url, typ, vad, upptackt")
+    .select("konkurrent, url, typ, vad, upptackt, kalla, ursprung")
     .eq("rapport_id", rapportId)
     .order("upptackt", { ascending: false })
     .limit(tak);

@@ -57,6 +57,7 @@ export default function Bevakningsvy({
   const [rader, sattRader] = useState<Forandring[]>(forandringar);
   const [kollar, sattKollar] = useState(false);
   const [kontrollerad, sattKontrollerad] = useState(false);
+  const [backar, sattBackar] = useState(false);
 
   const { konkurrenter, egen } = serier(rapport);
   const krok = byggKrok(rapport);
@@ -66,6 +67,30 @@ export default function Bevakningsvy({
     .sort()
     .at(-1);
 
+
+  // The archive already watched these pages for years. A feed that starts empty
+  // is a feed nobody comes back to.
+  async function backaHistorik() {
+    if (backar) return;
+    sattBackar(true);
+    try {
+      const svar = await fetch("/api/historik", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = (await svar.json()) as { forandringar?: Forandring[] };
+      if (data.forandringar?.length) {
+        sattRader((r) =>
+          [...data.forandringar!, ...r].sort((a, b) => b.upptackt.localeCompare(a.upptackt)),
+        );
+      }
+    } catch {
+      // Nothing found and a failed fetch look the same to the reader.
+    } finally {
+      sattBackar(false);
+    }
+  }
 
   async function koraKontroll() {
     if (kollar) return;
@@ -124,10 +149,18 @@ export default function Bevakningsvy({
 
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-14 px-6 py-14">
         <section className="flex flex-col gap-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-3 [&>div]:flex [&>div]:gap-2">
             <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
               What has moved
             </h2>
+            <button
+              type="button"
+              onClick={backaHistorik}
+              disabled={backar}
+              className="ej-tryck border border-linje px-4 py-2 text-sm text-dampad transition-colors hover:border-black hover:text-black disabled:opacity-50"
+            >
+              {backar ? "Reading the archive…" : "Build history"}
+            </button>
             <button
               type="button"
               onClick={koraKontroll}
@@ -164,6 +197,16 @@ export default function Bevakningsvy({
                       >
                         <span className="text-black">{f.konkurrent}</span>
                         <span className="text-[15px] text-dampad">{f.vad}</span>
+                        {f.kalla && (
+                          <a
+                            href={f.kalla}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ej-tryck text-[11px] uppercase tracking-[0.12em] text-amber underline-offset-4 hover:underline"
+                          >
+                            {f.ursprung === "arkiv" ? "Archived capture" : "Source"}
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>

@@ -243,4 +243,8 @@ export type Forandring = {
   typ: SidTyp;
   vad: string;
   upptackt: string;
+  /** The page this was read from — for archive rows, a dated capture. */
+  kalla?: string | null;
+  /** "kontroll" when we saw it change; "arkiv" when the archive did. */
+  ursprung?: "kontroll" | "arkiv" | null;
 };

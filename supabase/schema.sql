@@ -95,3 +95,42 @@ alter table koll_rapporter add column if not exists epost text;
 -- address, and on what" — without reading every report body.
 create index if not exists koll_rapporter_epost_idx
   on koll_rapporter (epost) where epost is not null;
+
+-- Where a change came from. A row backfilled from the Internet Archive cites a
+-- dated capture, which a reader can open and check themselves — more checkable
+-- than a live page, which has already moved on.
+alter table koll_forandringar add column if not exists kalla text;
+alter table koll_forandringar add column if not exists ursprung text default 'kontroll';
+
+-- ---------------------------------------------------------------------------
+-- Ägare. Real accounts (Supabase Auth, Google) arrive after the product has
+-- been running without them, so ownership is bolted on rather than assumed.
+--
+-- Nullable, and it must stay nullable: every report made so far has no owner,
+-- and the product's promise is still "the url is the account" — anyone holding
+-- a link reads the report, signed in or not. This column only answers the extra
+-- question an account makes possible: "which of these are mine?".
+--
+-- `on delete set null` rather than cascade: deleting an account must not delete
+-- somebody's report. The link keeps working; it simply goes back to being
+-- ownerless, exactly like every report from before this column existed.
+--
+-- It references auth.users, which lives in the Auth schema of this same
+-- project. No grant needed — `grant all on table koll_rapporter` above already
+-- covers columns added later; the Management API's missing default privileges
+-- only bite on new *tables*.
+--
+-- Relationship to `epost` above: they are deliberately separate. `epost` is a
+-- contact address typed into a report by someone with no account, and is never
+-- evidence of identity — anyone can type any address. `anvandare` is the only
+-- identity in this schema. A report can have one, the other, both or neither.
+-- ---------------------------------------------------------------------------
+
+alter table koll_rapporter
+  add column if not exists anvandare uuid references auth.users (id) on delete set null;
+
+-- "My reports, newest first" — the only query this column exists for. Partial,
+-- because the overwhelming majority of rows are ownerless and would otherwise
+-- bloat the index without ever being looked up through it.
+create index if not exists koll_rapporter_anvandare_idx
+  on koll_rapporter (anvandare, skapad desc) where anvandare is not null;

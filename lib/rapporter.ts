@@ -71,6 +71,15 @@ export async function loggaForandringar(
   const klient = db();
   if (!klient || !forandringar.length) return;
   await klient.from("koll_forandringar").insert(
-    forandringar.map((f) => ({ rapport_id: rapportId, ...f })),
+    forandringar.map((f) => ({
+      rapport_id: rapportId,
+      konkurrent: f.konkurrent,
+      url: f.url,
+      typ: f.typ,
+      vad: f.vad,
+      upptackt: f.upptackt,
+      kalla: f.kalla ?? null,
+      ursprung: f.ursprung ?? "kontroll",
+    })),
   );
 }
