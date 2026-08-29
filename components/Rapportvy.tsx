@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Insikt, Konkurrent, Rapport } from "@/lib/types";
+import type { Forandring, Insikt, Konkurrent, Rapport } from "@/lib/types";
 
 function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | null }) {
   const [oppen, satt] = useState(false);
@@ -154,6 +154,8 @@ export default function Rapportvy({
 }) {
   const [bevakas, sattBevakas] = useState(bevakasFran);
   const [delad, sattDelad] = useState(false);
+  const [kontrollerar, sattKontrollerar] = useState(false);
+  const [forandringar, sattForandringar] = useState<Forandring[] | null>(null);
   const hittade = rapport.konkurrenter.filter((k) => k.hittadAv === "agenten").length;
 
   async function vaxlaBevakning() {
@@ -165,6 +167,24 @@ export default function Rapportvy({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, bevakas: nytt }),
     }).catch(() => sattBevakas(!nytt));
+  }
+
+  async function koraKontroll() {
+    if (!id || kontrollerar) return;
+    sattKontrollerar(true);
+    try {
+      const svar = await fetch("/api/kontroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = (await svar.json()) as { forandringar: Forandring[] };
+      sattForandringar(data.forandringar ?? []);
+    } catch {
+      sattForandringar([]);
+    } finally {
+      sattKontrollerar(false);
+    }
   }
 
   return (
@@ -213,6 +233,29 @@ export default function Rapportvy({
         </div>
       </section>
 
+      {forandringar !== null && (
+        <section className="flex flex-col gap-4 border-l-2 border-amber pl-5">
+          <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
+            Sedan rapporten skrevs
+          </h2>
+          {forandringar.length === 0 ? (
+            <p className="text-[15px] text-dampad">
+              Inget har ändrats på de {rapport.konkurrenter.reduce((n, k) => n + k.sidor.length, 0)}{" "}
+              sidor vi bevakar.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {forandringar.map((f, n) => (
+                <li key={`${f.url}-${n}`} className="flex flex-col gap-0.5">
+                  <span className="text-[15px] text-black">{f.vad}</span>
+                  <span className="text-xs text-dampad">{f.konkurrent}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {id && (
         <footer className="flex flex-wrap items-center gap-3 border-t border-linje pt-8">
           <button
@@ -225,6 +268,14 @@ export default function Rapportvy({
             }`}
           >
             {bevakas ? "Bevakas — vi hör av oss" : "Bevaka dessa"}
+          </button>
+          <button
+            type="button"
+            onClick={koraKontroll}
+            disabled={kontrollerar}
+            className="border border-linje px-5 py-2.5 text-sm text-dampad hover:border-black hover:text-black disabled:opacity-50"
+          >
+            {kontrollerar ? "Läser om sidorna…" : "Kör kontroll nu"}
           </button>
           <button
             type="button"

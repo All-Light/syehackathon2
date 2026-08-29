@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { exaSok, harExa } from "../exa";
 import { parallellt, sok, type SokTraff } from "../firecrawl";
 import { struktur } from "../llm";
 import type { Foretag } from "../types";
@@ -12,6 +13,9 @@ const KATALOGER = [
 ];
 
 export type Kandidat = { namn: string; url: string; varfor: string };
+
+/** "Bästa bokföringsprogram 2026" is a listicle, not a competitor. */
+const JAMFORELSE = /\b(j[aä]mf[oö]r|b[aä]st[ae]?|topp\s*\d|test|guide|recension|reviews?|alternatives?|vs)\b|\b20\d\d\b/i;
 
 function domän(url: string): string {
   try {
@@ -32,17 +36,28 @@ export async function upptackKonkurrenter(
 ): Promise<Kandidat[]> {
   const svensk = /svensk/i.test(egen.sprak) || /sverige/i.test(egen.geografi);
 
-  const fragor = [
-    ...egen.nyckelord.slice(0, 2).map((k) => `${k} ${svensk ? "Sverige" : ""}`.trim()),
-    `alternativ till ${egen.namn}`,
-    `${egen.namn} konkurrenter`,
-  ].filter(Boolean);
+  const fragor = harExa()
+    ? [
+        `${egen.nyckelord[0]} för ${egen.malgrupp}${svensk ? " i Sverige" : ""}`,
+        `företag som erbjuder ${egen.vadNiSaljer.slice(0, 90)}`,
+        `alternativ till ${egen.namn}`,
+      ]
+    : [
+        ...egen.nyckelord.slice(0, 2).map((k) => `${k} ${svensk ? "Sverige" : ""}`.trim()),
+        `alternativ till ${egen.namn}`,
+        `${egen.namn} konkurrenter`,
+      ];
 
   const traffar = await parallellt(fragor, 4, async (fraga) => {
     loggning?.(`Söker: "${fraga}"`);
     try {
-      return await sok(fraga, { limit: 6, land: svensk ? "Sweden" : "Sweden" });
-    } catch {
+      if (harExa()) {
+        const ut = await exaSok(fraga, { antal: 7 });
+        return ut.map((t) => ({ url: t.url, title: t.title, description: "" }));
+      }
+      return await sok(fraga, { limit: 6, land: "Sweden" });
+    } catch (e) {
+      console.error("[upptack] sök:", e instanceof Error ? e.message : e);
       return [] as SokTraff[];
     }
   });
@@ -50,6 +65,8 @@ export async function upptackKonkurrenter(
   const egenDoman = domän(egen.url);
   const sedda = new Set<string>([egenDoman]);
   const rader: string[] = [];
+  // If the ranking call fails we still have something to research.
+  const reserv: Kandidat[] = [];
 
   for (const grupp of traffar) {
     for (const t of grupp) {
@@ -58,8 +75,14 @@ export async function upptackKonkurrenter(
       sedda.add(d);
       const katalog = KATALOGER.some((k) => d.endsWith(k));
       rader.push(
-        `${katalog ? "[KATALOG] " : ""}${d} — ${t.title ?? ""} — ${(t.description ?? "").slice(0, 200)}`,
+        `${katalog ? "[KATALOG] " : ""}${d} — ${t.title ?? ""} — ${(t.description ?? "").slice(0, 110)}`,
       );
+      const listicle = JAMFORELSE.test(t.title ?? "") || JAMFORELSE.test(d);
+      const rubrik = (t.title ?? "").split(/[|–—:]/)[0].trim();
+      // A company name is short. "Så tjänar dina konkurrenter pengar" is an article.
+      if (!katalog && !listicle && rubrik.split(/\s+/).length <= 3) {
+        reserv.push({ namn: rubrik || d, url: `https://${d}`, varfor: "Dök upp högt i sökningarna." });
+      }
     }
   }
 
@@ -74,7 +97,7 @@ export async function upptackKonkurrenter(
       ),
   });
 
-  const p = `Du väljer ut vilka företag som faktiskt konkurrerar med ett annat företag.
+  const bygg = (antal: number) => `Du väljer ut vilka företag som faktiskt konkurrerar med ett annat företag.
 
 # Företaget
 ${egen.namn} (${egen.url})
@@ -87,10 +110,10 @@ ${angivna.length ? `# Användaren har redan pekat ut dessa\n${angivna.join("\n")
 Rader märkta [KATALOG] är kataloger, jämförelsesajter eller sociala medier. De är
 INTE konkurrenter — men namn som nämns i deras beskrivningar kan vara det.
 
-${rader.slice(0, 60).join("\n")}
+${rader.slice(0, antal).join("\n")}
 
 # Uppgift
-Välj de ${Math.max(1, 5 - angivna.length)} företag som mest sannolikt konkurrerar om samma kunder.
+Välj de ${Math.max(1, 4 - angivna.length)} företag som mest sannolikt konkurrerar om samma kunder.
 Regler:
 - Ta ALDRIG med ${egenDoman} själv.
 - Ta aldrig med en katalog, en jämförelsesajt, ett socialt nätverk eller en nyhetsartikel.
@@ -101,13 +124,27 @@ Regler:
 Svara med ENBART giltig JSON:
 {"konkurrenter":[{"namn":"","url":"","varfor":""}]}`;
 
-  const ut = await struktur(p, Schema);
+  // Latency on this call swings from 5 s to 45 s on the same prompt shape.
+  // Try once with everything, then again with a third of the rows, and only
+  // then fall back — inventing competitors is worse than admitting failure.
+  const ut =
+    (await struktur(bygg(32), Schema, { timeoutMs: 150_000, forsok: 1 }).catch((e) => {
+      console.error("[upptack] rankning 1:", e instanceof Error ? e.message : e);
+      loggning?.("Rankningen tog för lång tid — försöker med färre träffar");
+      return null;
+    })) ??
+    (await struktur(bygg(12), Schema, { timeoutMs: 90_000, forsok: 1 }).catch((e) => {
+      console.error("[upptack] rankning 2:", e instanceof Error ? e.message : e);
+      loggning?.("Rankningen svarade inte — går på sökträffarna i stället");
+      return { konkurrenter: reserv };
+    }));
 
   const rensade: Kandidat[] = [];
   const tagna = new Set<string>([egenDoman]);
   for (const k of ut.konkurrenter.slice(0, 8)) {
     const d = domän(k.url);
     if (tagna.has(d) || KATALOGER.some((kat) => d.endsWith(kat))) continue;
+    if (JAMFORELSE.test(k.namn) || JAMFORELSE.test(d)) continue;
     tagna.add(d);
     rensade.push({ ...k, url: `https://${d}` });
   }

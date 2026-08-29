@@ -4,6 +4,24 @@
  */
 const BAS = process.env.FIRECRAWL_BASE_URL ?? "https://api.firecrawl.dev/v2";
 const TIMEOUT = Number(process.env.FIRECRAWL_TIMEOUT_MS ?? 45_000);
+/** The plan allows ~18 requests a minute. Staying under is cheaper than a 429
+ *  that costs a 45-second retry-after in the middle of a demo. */
+const TAK_PER_MIN = Number(process.env.FIRECRAWL_RPM ?? 15);
+
+let fonster: number[] = [];
+
+/** Rolling-window gate shared by every call in the process. */
+async function slussa(): Promise<void> {
+  for (;;) {
+    const nu = Date.now();
+    fonster = fonster.filter((t) => nu - t < 60_000);
+    if (fonster.length < TAK_PER_MIN) {
+      fonster.push(nu);
+      return;
+    }
+    await new Promise((k) => setTimeout(k, 60_000 - (nu - fonster[0]) + 60));
+  }
+}
 
 export type SokTraff = {
   url: string;
@@ -14,24 +32,40 @@ export type SokTraff = {
 
 export type Lank = { url: string; title?: string; description?: string };
 
+/**
+ * Five competitors researched at once means bursts of parallel calls, and a
+ * swallowed 429 looks exactly like "this company has no public accounts".
+ * Back off and retry instead of losing the data.
+ */
 async function anrop<T>(vag: string, kropp: unknown): Promise<T> {
   const nyckel = process.env.FIRECRAWL_API_KEY;
   if (!nyckel) throw new Error("FIRECRAWL_API_KEY saknas i miljön.");
 
-  const r = await fetch(`${BAS}${vag}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${nyckel}`,
-    },
-    body: JSON.stringify(kropp),
-    signal: AbortSignal.timeout(TIMEOUT),
-  });
+  let sistaFel = "";
+  for (let forsok = 0; forsok < 3; forsok++) {
+    await slussa();
+    const r = await fetch(`${BAS}${vag}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${nyckel}`,
+      },
+      body: JSON.stringify(kropp),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
 
-  if (!r.ok) {
-    throw new Error(`Firecrawl ${vag} svarade ${r.status}: ${await r.text()}`);
+    if (r.ok) return (await r.json()) as T;
+
+    sistaFel = `Firecrawl ${vag} svarade ${r.status}: ${(await r.text()).slice(0, 200)}`;
+    if (r.status !== 429 && r.status < 500) break;
+
+    const efter = Number(r.headers.get("retry-after"));
+    const vanta = Number.isFinite(efter) && efter > 0 ? efter * 1000 : 1500 * 2 ** forsok;
+    console.warn(`[firecrawl] ${r.status} på ${vag}, väntar ${vanta} ms`);
+    await new Promise((k) => setTimeout(k, Math.min(vanta, 15_000)));
   }
-  return (await r.json()) as T;
+
+  throw new Error(sistaFel);
 }
 
 /** Web search. `location` steers the result set to Swedish sources. */
@@ -83,8 +117,9 @@ export async function skrapa(url: string): Promise<Sida | null> {
       markdown,
       titel: svar.data?.metadata?.title ?? url,
     };
-  } catch {
-    // One dead page must not kill a five-competitor run.
+  } catch (e) {
+    // One dead page must not kill a five-competitor run — but say why.
+    console.error(`[skrapa] ${url}:`, e instanceof Error ? e.message : e);
     return null;
   }
 }

@@ -5,7 +5,7 @@ import { plockaJson } from "./json";
  * Provider-agnostic. Carried over from Lugn: "zen" (OpenCode Zen) by default,
  * any OpenAI-shaped endpoint via LLM_PROVIDER=openai-compatible.
  */
-async function transport(): Promise<(prompt: string) => Promise<string>> {
+async function transport(): Promise<(prompt: string, timeoutMs?: number) => Promise<string>> {
   const provider = process.env.LLM_PROVIDER ?? process.env.GRADER_PROVIDER ?? "zen";
   const { kor } =
     provider === "openai-compatible"
@@ -21,13 +21,14 @@ async function transport(): Promise<(prompt: string) => Promise<string>> {
 export async function struktur<T>(
   prompt: string,
   schema: z.ZodType<T>,
-  forsok = 2,
+  val: { forsok?: number; timeoutMs?: number } = {},
 ): Promise<T> {
   const kor = await transport();
+  const forsok = val.forsok ?? 2;
   let sistaFel: unknown;
   for (let n = 0; n < forsok; n++) {
     try {
-      return schema.parse(plockaJson(await kor(prompt)));
+      return schema.parse(plockaJson(await kor(prompt, val.timeoutMs)));
     } catch (e) {
       sistaFel = e;
     }

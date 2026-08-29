@@ -1,63 +1,77 @@
-import { z } from "zod";
+import { exaSok, harExa } from "../exa";
 import { skrapa, sok } from "../firecrawl";
-import { struktur } from "../llm";
 import type { Orgdata } from "../types";
 
-const Schema = z.object({
-  orgnr: z.string().nullable(),
-  omsattningTkr: z.number().nullable(),
-  resultatTkr: z.number().nullable(),
-  anstallda: z.number().nullable(),
-  tillvaxtProcent: z.number().nullable(),
-  ar: z.number().nullable(),
-  citat: z.string().nullable(),
-});
+const REGISTER = ["allabolag.se", "bolagsfakta.se", "ratsit.se", "proff.se"];
+const REGISTER_RE = /allabolag\.se|bolagsfakta\.se|ratsit\.se|proff\.se/;
+
+/** "1 796 000", with the non-breaking spaces the registers render it with. */
+function tal(rå: string | undefined): number | null {
+  if (!rå) return null;
+  const n = Number(rå.replace(/[\s  ]/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function plocka(md: string, url: string): Orgdata | null {
+  const oms = md.match(/Omsättning\s*(\d{4})?\s*(-?[\d\s  ]{3,})/);
+  const res = md.match(/Resultat efter finansnetto\s*(\d{4})?\s*(-?[\d\s  ]{3,})/);
+  const anst = md.match(/Antal anställda\s*(\d[\d\s  ]*)/);
+  const org = md.match(/(?:Org\.?nr|Organisationsnummer)\s*(\d{6}-?\d{4})/);
+
+  const omsattningTkr = tal(oms?.[2]);
+  const anstallda = tal(anst?.[1]);
+  if (omsattningTkr === null && anstallda === null) return null;
+
+  const rad = (oms ?? anst)?.[0]?.replace(/[  ]/g, " ").trim() ?? null;
+
+  return {
+    orgnr: org?.[1] ?? null,
+    omsattningTkr,
+    resultatTkr: tal(res?.[2]),
+    anstallda,
+    // The registers chart history in JavaScript, so year-on-year growth is not
+    // in the text. Better absent than guessed.
+    tillvaxtProcent: null,
+    ar: oms?.[1] ? Number(oms[1]) : null,
+    kalla: rad ? { url, citat: rad } : null,
+  };
+}
 
 /**
  * The moat. Every Swedish AB files public annual accounts, so we can state a
- * competitor's revenue, headcount and growth — which no marketing page reveals
- * and no tool built for the US market goes looking for.
+ * competitor's revenue and headcount — which no marketing page reveals and no
+ * tool built for the US market goes looking for.
+ *
+ * Parsed, not prompted: the registers render these figures in a fixed shape,
+ * and a regex cannot invent a number that is not on the page.
  */
 export async function hamtaOrgdata(namn: string): Promise<Orgdata | null> {
-  let traffar;
-  try {
-    traffar = await sok(`${namn} omsättning anställda bokslut`, { limit: 4 });
-  } catch {
-    return null;
+  // Exa can search inside the registers and hand back the page text in one
+  // call, which keeps the whole lookup off the Firecrawl rate limit.
+  if (harExa()) {
+    try {
+      const traffar = await exaSok(`${namn} omsättning anställda bokslut`, {
+        antal: 3,
+        domaner: REGISTER,
+        text: 3_000,
+      });
+      for (const t of traffar) {
+        const ut = t.text ? plocka(t.text, t.url) : null;
+        if (ut) return ut;
+      }
+    } catch (e) {
+      console.error(`[orgdata] exa ${namn}:`, e instanceof Error ? e.message : e);
+    }
   }
 
-  const kandidat = traffar.find((t) =>
-    /allabolag\.se|bolagsfakta\.se|ratsit\.se|proff\.se/.test(t.url),
-  );
-  if (!kandidat) return null;
-
-  const sida = await skrapa(kandidat.url);
-  if (!sida) return null;
-
-  const p = `Du läser en svensk bolagsupplysningssida och plockar ut nyckeltalen.
-
-# Sidan
-${sida.url}
-
-${sida.markdown.slice(0, 10_000)}
-
-# Uppgift
-Plocka ut siffrorna för ${namn}. Om sidan handlar om ett ANNAT bolag, sätt allt till null.
-- Belopp i TUSENTALS kronor (tkr). Står det "4 236" i en tkr-kolumn är svaret 4236.
-- "tillvaxtProcent": omsättningsförändring mot föregående år, om den framgår.
-- "ar": vilket räkenskapsår siffrorna avser.
-- "citat": den rad från sidan som siffrorna kommer ifrån, ordagrant. null om osäker.
-Hitta ALDRIG på en siffra. null är ett korrekt svar.
-
-Svara med ENBART giltig JSON:
-{"orgnr":null,"omsattningTkr":null,"resultatTkr":null,"anstallda":null,"tillvaxtProcent":null,"ar":null,"citat":null}`;
-
   try {
-    const ut = await struktur(p, Schema);
-    if (ut.omsattningTkr === null && ut.anstallda === null) return null;
-    const { citat, ...tal } = ut;
-    return { ...tal, kalla: citat ? { url: sida.url, citat } : null };
-  } catch {
+    const traffar = await sok(`${namn} allabolag omsättning anställda`, { limit: 5 });
+    const kandidat = traffar.find((t) => REGISTER_RE.test(t.url));
+    if (!kandidat) return null;
+    const sida = await skrapa(kandidat.url);
+    return sida ? plocka(sida.markdown, sida.url) : null;
+  } catch (e) {
+    console.error(`[orgdata] ${namn}:`, e instanceof Error ? e.message : e);
     return null;
   }
 }

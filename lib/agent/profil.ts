@@ -39,6 +39,6 @@ Fyll i fälten utifrån vad som FAKTISKT står på sidan. Gissa inte.
 Svara med ENBART giltig JSON:
 {"namn":"","vadNiSaljer":"","malgrupp":"","prismodell":"","sprak":"","geografi":"","nyckelord":[]}`;
 
-  const ut = await struktur(p, Schema);
+  const ut = await struktur(p, Schema, { timeoutMs: 60_000 });
   return { ...ut, nyckelord: ut.nyckelord.slice(0, 6), url: sida.url };
 }

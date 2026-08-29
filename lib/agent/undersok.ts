@@ -26,7 +26,11 @@ const KonkurrentSchema = z.object({
 type Val = { url: string; typ: SidTyp };
 
 const MÖNSTER: { typ: SidTyp; re: RegExp; vikt: number }[] = [
-  { typ: "pris", re: /\/(pricing|prices?|priser|prisplan|plans?|abonnemang|kostnad)/i, vikt: 100 },
+  // Swedish sites call it /priser, /prislista, /paket or /abonnemang as often
+  // as /pricing. A page named for the price list beats one named for the bundle:
+  // Fortnox's /paket is prose about costs, /produkt/prislista is the actual table.
+  { typ: "pris", re: /\/(pricing|prices?|pris[a-zåäö]*)/i, vikt: 100 },
+  { typ: "pris", re: /\/(paket|plans?|abonnemang|kostnad)/i, vikt: 90 },
   { typ: "produkt", re: /\/(product|produkt|features?|funktioner|tjanster|tjänster|services?)/i, vikt: 50 },
   { typ: "om", re: /\/(about|om-oss|om|company|foretaget|företaget)/i, vikt: 30 },
   { typ: "nyheter", re: /\/(changelog|releases?|news|nyheter|blog|blogg)/i, vikt: 20 },
@@ -57,11 +61,11 @@ function valjSidor(startsida: string, lankar: Lank[]): Val[] {
     .sort((a, b) => b[1].vikt - a[1].vikt)
     // One page of each kind. Four /blog/ posts tell us nothing four times.
     .filter((rad, _i, alla) => alla.findIndex((x) => x[1].typ === rad[1].typ) === alla.indexOf(rad))
-    .slice(0, 3)
+    .slice(0, 2)
     .map(([url, v]) => ({ url, typ: v.typ }));
 
   const harStart = valda.some((v) => v.url.replace(/\/$/, "") === startsida.replace(/\/$/, ""));
-  return harStart ? valda : [{ url: startsida, typ: "produkt" as SidTyp }, ...valda].slice(0, 3);
+  return harStart ? valda : [{ url: startsida, typ: "produkt" as SidTyp }, ...valda].slice(0, 2);
 }
 
 /** Markdown emphasis and table pipes must not make a real quote look invented. */
@@ -122,7 +126,7 @@ ${kandidat.namn} — ${kandidat.url}
 
 # Sidorna
 ${levande
-  .map((l) => `## ${l.typ.toUpperCase()} — ${l.sida.url}\n${l.sida.markdown.slice(0, 4_500)}`)
+  .map((l) => `## ${l.typ.toUpperCase()} — ${l.sida.url}\n${l.sida.markdown.slice(0, l.typ === "pris" ? 6_000 : 2_500)}`)
   .join("\n\n")}
 
 # Uppgift
@@ -137,6 +141,7 @@ ${levande
 Svara med ENBART giltig JSON:
 {"positionering":"","malgrupp":"","priser":[{"namn":"","pris":"","period":null,"citat":"","kallURL":""}],"funktioner":[],"styrkor":[],"svagheter":[]}`,
           KonkurrentSchema,
+          { timeoutMs: 75_000 },
         ).catch((e) => {
           console.error(`[undersok] ${kandidat.namn}:`, e instanceof Error ? e.message : e);
           return null;
@@ -158,10 +163,16 @@ Svara med ENBART giltig JSON:
     priser: dedup(
       (detaljer?.priser ?? []).filter((p) => {
         const c = normalisera(p.citat ?? "");
-        return c.length >= 6 && text.includes(c.slice(0, 30));
+        const ok = c.length >= 6 && text.includes(c.slice(0, 30));
+        if (!ok) {
+          console.warn(`[pris] ${kandidat.namn}: släppte "${p.namn} ${p.pris}" — citatet fanns inte på sidan`);
+        }
+        return ok;
       }),
       (p) => `${normalisera(p.namn)}|${normalisera(p.pris)}`,
-    ).map((p) => ({
+    )
+      .slice(0, 6)
+      .map((p) => ({
       namn: p.namn,
       pris: p.pris,
       period: p.period,

@@ -78,7 +78,7 @@ ${konkurrenter.map(beskriv).join("\n\n")}
 Svara med ENBART giltig JSON:
 {"sammanfattning":"","hot":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"luckor":[{"rubrik":"","text":"","konkurrent":null,"citat":null,"kallURL":null}],"atgarder":[]}`;
 
-  const ut = await struktur(p, Schema);
+  const ut = await struktur(p, Schema, { timeoutMs: 90_000 });
   const insikt = (i: z.infer<typeof Schema>["hot"][number]) => ({
     rubrik: i.rubrik,
     text: i.text,

@@ -3,7 +3,7 @@
  * DeepSeek, OpenRouter or other key — set GRADER_PROVIDER=openai-compatible and
  * the three env vars below. No other code changes.
  */
-export async function kor(prompt: string): Promise<string> {
+export async function kor(prompt: string, timeoutMs?: number): Promise<string> {
   const bas = process.env.GRADER_BASE_URL;
   const nyckel = process.env.GRADER_API_KEY;
   const modell = process.env.GRADER_MODEL;
@@ -25,7 +25,7 @@ export async function kor(prompt: string): Promise<string> {
       temperature: 0.2,
       response_format: { type: "json_object" },
     }),
-    signal: AbortSignal.timeout(Number(process.env.GRADER_TIMEOUT_MS ?? 60_000)),
+    signal: AbortSignal.timeout(timeoutMs ?? Number(process.env.GRADER_TIMEOUT_MS ?? 60_000)),
   });
 
   if (!r.ok) throw new Error(`Grader svarade ${r.status}: ${await r.text()}`);
