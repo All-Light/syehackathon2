@@ -423,7 +423,7 @@ export default function Rapportvy({
         </footer>
       )}
 
-      {id && (betald || rapport.full || process.env.NODE_ENV !== "production") && (
+      {id && (
         <section className="ej-tryck flex flex-col gap-3 border-t border-linje pt-12">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
             The full report

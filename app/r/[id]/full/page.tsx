@@ -26,7 +26,6 @@ export default async function FullSida({
   const sparad = await hamtaRapport(id);
   if (!sparad) notFound();
 
-  const utveckling = process.env.NODE_ENV !== "production";
 
   return (
     <main className="min-h-dvh bg-papper">
@@ -39,7 +38,7 @@ export default async function FullSida({
           id={id}
           namn={sparad.rapport.egen.namn}
           befintlig={sparad.rapport.full}
-          kanKopa={sparad.betald || utveckling}
+          kanKopa
           /* Read on the server so it reflects the address this page was
              requested with. The component clears it from the address as soon as
              it acts on it, so a reload mid-run arrives here without it. */

@@ -17,12 +17,18 @@ export async function POST(req: Request) {
   const sparad = await hamtaRapport(id);
   if (!sparad) return new Response("No such report.", { status: 404 });
 
-  const utveckling = process.env.NODE_ENV !== "production";
-  if (!sparad.betald && !utveckling) {
-    return new Response("This report has not been bought.", { status: 402 });
+  // Open to everyone for now. It is the strongest thing the product makes, and
+  // more people seeing it is worth more today than the 500 kr it is priced at —
+  // which nobody can pay anyway while selling is switched off.
+  if (!sparad.betald) {
+    console.warn("[full] writing an unpaid report for %s", id);
   }
-  if (utveckling && !sparad.betald) {
-    console.warn("[full] development server — writing without payment");
+
+  // Writing one costs minutes of research and real money, and the report is
+  // saved when it finishes. If a reader already has one, hand it back rather
+  // than paying to produce the same thing twice.
+  if (sparad.rapport.full) {
+    return Response.json({ full: sparad.rapport.full, redanSkriven: true });
   }
 
   const kodare = new TextEncoder();
