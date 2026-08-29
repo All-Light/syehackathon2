@@ -94,3 +94,76 @@ html {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Print. The customer files this, or hands it to their accountant, so the paper
+   version is a deliverable rather than a screenshot of a web page: no controls,
+   no colour it cannot reproduce, and every source spelled out — a link is not
+   clickable on paper.
+   --------------------------------------------------------------------------- */
+@page {
+  size: A4;
+  margin: 18mm 15mm 20mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+    color: #111;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  /* Anything you press is meaningless once printed. */
+  .ej-tryck,
+  button {
+    display: none !important;
+  }
+
+  /* A competitor should not be split across a page break mid-table. */
+  .tryck-hel {
+    break-inside: avoid;
+  }
+
+  .tryck-ny-sida {
+    break-before: page;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  /* Sources are the whole argument, so they print in full whether or not the
+     reader had expanded them on screen. */
+  .kalla-text {
+    display: block !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Tell the reader where a claim came from, in print, where hovering is not
+     an option. */
+  .tryck-url::after {
+    content: " (" attr(href) ")";
+    font-size: 8.5pt;
+    color: #555;
+    word-break: break-all;
+  }
+}
+
+/* Screen never sees the cover sheet or the sources appendix. */
+.endast-tryck {
+  display: none;
+}
+
+@media print {
+  .endast-tryck {
+    display: block;
+  }
+}

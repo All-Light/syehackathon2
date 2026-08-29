@@ -4,6 +4,7 @@ import { useState } from "react";
 import Betala from "@/components/Betala";
 import Djupdyk from "@/components/Djupdyk";
 import Lyssna from "@/components/Lyssna";
+import { Framsida, Kallor } from "@/components/Tryck";
 import type { Forandring, Insikt, Konkurrent, Namngiven, Rapport } from "@/lib/types";
 
 function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | null }) {
@@ -14,24 +15,26 @@ function Kallhanvisning({ kalla }: { kalla: { url: string; citat: string } | nul
       <button
         type="button"
         onClick={() => satt((o) => !o)}
-        className="self-start text-[11px] uppercase tracking-[0.12em] text-amber underline-offset-4 hover:underline"
+        className="ej-tryck self-start text-[11px] uppercase tracking-[0.12em] text-amber underline-offset-4 hover:underline"
         aria-expanded={oppen}
       >
         {oppen ? "Hide source" : "Show source"}
       </button>
-      {oppen && (
-        <span className="block border-l-2 border-linje pl-3 text-sm text-dampad">
-          <span className="block italic">&ldquo;{kalla.citat}&rdquo;</span>
-          <a
-            href={kalla.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 block break-all text-xs text-amber underline-offset-4 hover:underline"
-          >
-            {kalla.url}
-          </a>
-        </span>
-      )}
+      <span
+        className={`kalla-text border-l-2 border-linje pl-3 text-sm text-dampad ${
+          oppen ? "block" : "hidden"
+        }`}
+      >
+        <span className="block italic">&ldquo;{kalla.citat}&rdquo;</span>
+        <a
+          href={kalla.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 block break-all text-xs text-amber underline-offset-4 hover:underline"
+        >
+          {kalla.url}
+        </a>
+      </span>
     </span>
   );
 }
@@ -61,7 +64,7 @@ function Insikter({ rubrik, poster }: { rubrik: string; poster: Insikt[] }) {
 
 function Kort({ k, id }: { k: Konkurrent; id: string | null }) {
   return (
-    <article className="flex flex-col gap-4 border border-linje bg-papper-djup/50 p-5">
+    <article className="tryck-hel flex flex-col gap-4 border border-linje bg-papper-djup/50 p-5">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h3 className="font-serif text-2xl text-black">{k.namn}</h3>
@@ -144,7 +147,7 @@ function Kort({ k, id }: { k: Konkurrent; id: string | null }) {
       )}
 
       {id && (
-        <div className="border-t border-linje pt-4">
+        <div className={`border-t border-linje pt-4 ${k.djup ? "" : "ej-tryck"}`}>
           <Djupdyk id={id} url={k.url} namn={k.namn} befintlig={k.djup} />
         </div>
       )}
@@ -243,7 +246,9 @@ export default function Rapportvy({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-14 px-6 py-16">
-      <header className="flex flex-col gap-4">
+      <Framsida rapport={rapport} />
+
+      <header className="ej-tryck flex flex-col gap-4">
         <span className="text-[11px] uppercase tracking-[0.16em] text-dampad">
           {rapport.egen.namn}
         </span>
@@ -288,7 +293,7 @@ export default function Rapportvy({
       </section>
 
       {(ovriga.length > 0 || id) && (
-        <section className="flex flex-col gap-4">
+        <section className="ej-tryck flex flex-col gap-4">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
             Also competing{ovriga.length > 0 && ` (${ovriga.length})`}
           </h2>
@@ -347,7 +352,7 @@ export default function Rapportvy({
       )}
 
       {forandringar !== null && (
-        <section className="flex flex-col gap-4 border-l-2 border-amber pl-5">
+        <section className="ej-tryck flex flex-col gap-4 border-l-2 border-amber pl-5">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-dampad">
             Since this report was written
           </h2>
@@ -370,7 +375,7 @@ export default function Rapportvy({
       )}
 
       {id && (
-        <footer className="flex flex-wrap items-center gap-3 border-t border-linje pt-8">
+        <footer className="ej-tryck flex flex-wrap items-center gap-3 border-t border-linje pt-8">
           <button
             type="button"
             onClick={vaxlaBevakning}
@@ -402,10 +407,23 @@ export default function Rapportvy({
           >
             {delad ? "Link copied" : "Share report"}
           </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="border border-linje px-5 py-2.5 text-sm text-dampad hover:border-black hover:text-black"
+          >
+            Save as PDF
+          </button>
         </footer>
       )}
 
-      {id && <Betala id={id} betald={betald} />}
+      {id && (
+        <div className="ej-tryck">
+          <Betala id={id} betald={betald} />
+        </div>
+      )}
+
+      <Kallor rapport={rapport} />
     </div>
   );
 }
