@@ -17,13 +17,15 @@ export function Svep({ totalt, klara }: { totalt: number; klara: number }) {
   return (
     // Decorative: the label beside it already states the same progress in words.
     <span className="svep" aria-hidden="true">
+      {/* First in the DOM, so it passes behind the ticks: the sweep lights the
+          rule, it does not wipe over the marks that carry the progress. */}
+      <span className="svep-huvud" />
       {Array.from({ length: totalt }, (_, i) => (
         <span
           key={i}
           className={`svep-tand${i < klara ? " svep-tand-klar" : ""}`}
         />
       ))}
-      <span className="svep-huvud" />
     </span>
   );
 }
@@ -50,7 +52,7 @@ export default function Arbetsvy({
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center gap-10 px-6 py-16">
       <div className="flex flex-col gap-3">
-        <span className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] text-dampad">
+        <span className="flex items-center gap-5 text-[11px] uppercase tracking-[0.16em] text-dampad">
           <Svep
             totalt={kandidater.length}
             klara={kandidater.filter((k) => k.klar).length}

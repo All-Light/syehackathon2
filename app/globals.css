@@ -213,8 +213,8 @@ html {
    The sweep. A run is not an unknown wait — it is a known set being read one
    item at a time: these competitors, these five angles, these arguments. So the
    working mark is a measuring scale rather than a spinner: a hairline rule with
-   one tick per source, tall and amber once that source has been read, short and
-   faint while it is still out. The count is the information; the travelling
+   one tick per source, tall and amber once that source has been read, low and
+   muted while it is still out. The count is the information; the travelling
    head only says the run is still moving, and is deliberately the quietest
    thing on the screen because the text beside it is what the reader is here for.
    --------------------------------------------------------------------------- */
@@ -251,8 +251,10 @@ html {
   content: "";
   position: absolute;
   inset: auto 0 0;
-  height: 4px;
-  background: var(--linje);
+  height: 5px;
+  /* Muted rather than hairline: at two pixels wide a --linje tick disappears,
+     and an unread source you cannot count is not a scale. */
+  background: color-mix(in oklab, var(--dampad) 42%, transparent);
   transition:
     height 450ms ease,
     background-color 450ms ease;
@@ -268,19 +270,23 @@ html {
   top: -2px;
   bottom: -1px;
   left: 0;
-  width: 20px;
-  margin-left: -20px;
+  width: 18px;
+  margin-left: -18px;
   pointer-events: none;
+  /* Almost all tail: the reading edge is the last pixel or two, so it passes as
+     a line rather than a block sliding over the ticks. */
   background: linear-gradient(
     to right,
-    transparent,
-    color-mix(in oklab, var(--amber) 16%, transparent) 70%,
-    color-mix(in oklab, var(--amber) 62%, transparent)
+    transparent 0%,
+    color-mix(in oklab, var(--amber) 10%, transparent) 60%,
+    color-mix(in oklab, var(--amber) 30%, transparent) 92%,
+    color-mix(in oklab, var(--amber) 68%, transparent) 99%,
+    transparent 100%
   );
-  animation: svep 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: svep 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* Travel is the track plus the head's own width, so it starts and ends clear
+/* Travel is the track plus the head's own width, so it enters and leaves clear
    of the rule instead of clipping at the edges. */
 @keyframes svep {
   0% {
@@ -288,12 +294,14 @@ html {
     opacity: 0;
   }
   14%,
-  86% {
+  84% {
     opacity: 1;
   }
+  /* Out at the far end rather than stopping dead, so the reset is a breath
+     between passes instead of a jump. */
   100% {
-    transform: translateX(4.75rem);
-    opacity: 1;
+    transform: translateX(4.625rem);
+    opacity: 0;
   }
 }
 
