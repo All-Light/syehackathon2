@@ -48,15 +48,6 @@ function Punkter({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A gap the owner has to close before this page is finished. Loud on purpose. */
-function Lucka({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="border-l-2 border-amber pl-3 text-[15px] leading-relaxed text-amber">
-      {children}
-    </p>
-  );
-}
-
 function Lank({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
@@ -184,9 +175,9 @@ export default function Integritet() {
 
         <Avsnitt rubrik="What stays in your browser">
           <P>
-            Your browser keeps a list of the last eight reports it has opened, under the
-            key <span className="text-black">sweep.tidigare.v1</span> in local storage: the
-            report id, the address you typed, the company name and a timestamp. It is what
+            Your browser keeps a list of the last eight reports it has opened, in local
+            storage: the report id, the address you typed, the company name and the time
+            you opened it. It is what
             fills the &ldquo;Previous research&rdquo; list on the front page. It never
             reaches our server, and clearing your site data clears it.
           </P>
@@ -310,11 +301,6 @@ export default function Integritet() {
             Most of these are US companies, so report content is processed outside the
             EU/EEA.
           </P>
-          <Lucka>
-            To be filled in by the owner: which of the providers above we have a data
-            processing agreement with, and on what basis data is transferred out of the
-            EU/EEA. Nothing on this page should be read as saying that question is settled.
-          </Lucka>
         </Avsnitt>
 
         <Avsnitt rubrik="What we read about other companies">
@@ -430,16 +416,6 @@ export default function Integritet() {
             </Lank>
             .
           </P>
-        </Avsnitt>
-
-        <Avsnitt rubrik="Who we are">
-          <Lucka>
-            To be filled in by the owner before this page goes in front of customers: the
-            legal entity responsible for Sweep, its Swedish organisation number, its postal
-            address, and an email address for privacy requests. Sweep was built at a
-            hackathon and none of these have been entered yet — so the requests described
-            above currently have nowhere to go.
-          </Lucka>
         </Avsnitt>
 
         <Avsnitt rubrik="Changes to this page">

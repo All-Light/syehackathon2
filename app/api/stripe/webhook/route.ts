@@ -19,8 +19,12 @@ export async function POST(req: Request) {
   } else {
     // Hackathon pragmatism: without the secret we cannot tell Stripe from
     // anyone else, so we process anyway rather than block a real payment.
-    // Set STRIPE_WEBHOOK_SECRET before this handles other people's money.
-    console.warn("[stripe] STRIPE_WEBHOOK_SECRET is not set — webhook processed unverified.");
+    // Refuse rather than trust. Processing an unsigned event means anyone who
+    // can POST to this URL can mark any report paid, and the report id is in
+    // the URL of every share link. A missing secret is a misconfiguration, not
+    // permission to skip the check.
+    console.error("[stripe] STRIPE_WEBHOOK_SECRET is not set — refusing the event.");
+    return new Response("Webhook signature checking is not configured.", { status: 503 });
   }
 
   let handelse: Handelse;

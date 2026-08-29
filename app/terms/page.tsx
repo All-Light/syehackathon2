@@ -42,15 +42,6 @@ function Punkter({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A gap the owner has to close before this page is finished. Loud on purpose. */
-function Lucka({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="border-l-2 border-amber pl-3 text-[15px] leading-relaxed text-amber">
-      {children}
-    </p>
-  );
-}
-
 export default function Villkor() {
   const oppet = kopAktivt();
   // Read on the server and rendered as a sentence, never as a value: a page that
@@ -160,11 +151,6 @@ export default function Villkor() {
                 : null}
             </P>
           )}
-          <Lucka>
-            To be filled in by the owner before sales are switched on: whether the prices
-            above include VAT, how a monitoring subscription is cancelled, and what the
-            refund and right-of-withdrawal terms are.
-          </Lucka>
         </Avsnitt>
 
         <Avsnitt rubrik="No warranty">
@@ -210,13 +196,8 @@ export default function Villkor() {
           </P>
         </Avsnitt>
 
-        <Avsnitt rubrik="Law and contact">
+        <Avsnitt rubrik="Law">
           <P>Swedish law applies to these terms.</P>
-          <Lucka>
-            To be filled in by the owner: the legal entity behind Sweep, its Swedish
-            organisation number, its postal address, and an email address to reach it at.
-            None of these have been entered yet.
-          </Lucka>
         </Avsnitt>
       </main>
       <Fot className="mt-auto" />

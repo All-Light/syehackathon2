@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Konto from "@/components/Konto";
-import { authKonfigurerad, hamtaAnvandare, taRapport } from "@/lib/auth";
+import { authKonfigurerad, hamtaAnvandare } from "@/lib/auth";
 import { hamtaRapport } from "@/lib/rapporter";
 import Flikar from "./Flikar";
 
@@ -12,6 +12,10 @@ import Flikar from "./Flikar";
  * its own cover sheet, and a tab you cannot link to is a tab you cannot send
  * to your accountant.
  */
+/** A share link is public to whoever holds it — that is not the same as being
+ *  public to a search engine. */
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function Rapportlayout({
   children,
   params,
@@ -23,10 +27,6 @@ export default async function Rapportlayout({
   const sparad = await hamtaRapport(id);
   const anvandare = await hamtaAnvandare();
 
-  // A signed-in reader opening an unowned report takes it. The link was always
-  // the only claim to a report; an account is a durable one, and taRapport
-  // refuses anything already owned.
-  if (anvandare && sparad) await taRapport(id);
 
   // A run still in flight has no report yet, and no tabs to offer.
   if (!sparad) return <>{children}</>;
